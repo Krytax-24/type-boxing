@@ -1,0 +1,422 @@
+/* Type Boxing: Terminal Arcade, full screen.
+   Palette: THEME.ui in js/config.js (main.js writes it onto :root at start; the values below are the same).
+   Layout: the arena canvas fills the window. #ui floats over it and is designed at 1366 x 768, then
+   scaled to the window by fitUi() in main.js, so every px value below is a design px.
+   Type scale: 12 / 16 / 24 / 32 / 64 px, weights 400 and 700. Spacing: 8 px grid (4 px only inside bars).
+   Panels: one radius (--r, 4 px) and one border (1 px solid --line). */
+
+* { box-sizing: border-box; }
+
+:root {
+  --bg: #060a18;
+  --surface: #0b1129;
+  --raised: #121a3a;
+  --line: #2a3a73;
+  --text: #e8edff;
+  --dim: #8d9ac8;
+  --phosphor: #4dff9a;
+  --magenta: #ff3ea5;
+  --gold: #ffc53d;
+  --danger: #ff4d5e;
+  --warn: #ff8a3d;
+  --info: #7ce3ff;
+  --track: #18224a;
+  --you: #f1f3f8;          /* your identity color (set by main.js from the Fighter screen) */
+  --you-letters: #4ade80;  /* your correct letters */
+  --foe: #e8737d;          /* the bot's identity color for this match */
+  --r: 4px;
+  --border: 1px solid var(--line);
+  --font: "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", "Courier New", monospace;
+  --t12: 12px; --t16: 16px; --t24: 24px; --t32: 32px; --t64: 64px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A dark outline for text that sits over the scenery. */
+  --outline: 0 2px 0 rgba(2, 4, 12, 0.95), 0 -1px 0 rgba(2, 4, 12, 0.95), 1px 0 0 rgba(2, 4, 12, 0.95), -1px 0 0 rgba(2, 4, 12, 0.95), 0 0 8px rgba(2, 4, 12, 0.85);
+  --panel-bg: rgba(11, 17, 41, 0.9);
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--t16);
+  user-select: none; -webkit-user-select: none;
+}
+
+/* The arena: edge to edge, no frame. main.js sizes the backing store to the window times the pixel ratio. */
+#arena { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; display: block; background: var(--bg); }
+
+/* Everything over the arena. main.js sets its width, height and scale (fitUi). */
+#ui { position: fixed; left: 0; top: 0; width: 1366px; height: 768px; transform-origin: 0 0; pointer-events: none; }
+#ui button, #overlay, #modal, #typing-box { pointer-events: auto; }
+#ui button { font-family: var(--font); color: var(--text); }
+#ui .btn.primary, #ui .mbtn.primary { color: var(--bg); }
+
+/* ---------- Buttons: one shape, tactile states ---------- */
+.btn, .mbtn, .icon-btn, .key, .seg, .fighter-chip, .pick {
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease), filter 0.15s var(--ease);
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; padding: 0 24px;
+  font-size: var(--t16); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; white-space: nowrap;
+  background: var(--surface); border: var(--border); border-radius: var(--r);
+}
+.btn:hover, .mbtn:hover, .icon-btn:hover, .key:hover, .seg:hover, .fighter-chip:hover { border-color: var(--dim); background: var(--raised); }
+.btn:active, .mbtn:active, .icon-btn:active, .key:active, .seg:active, .fighter-chip:active, .pick:active { transform: translateY(1px) scale(0.98); }
+.btn.primary, .mbtn.primary { background: var(--phosphor); border-color: var(--phosphor); color: var(--bg); }
+.btn.primary:hover, .mbtn.primary:hover { background: var(--phosphor); filter: brightness(1.12); }
+.btn.primary kbd, .mbtn.primary kbd { background: rgba(6, 10, 24, 0.85); border-color: rgba(6, 10, 24, 0.85); color: var(--phosphor); }
+.btn-row { display: flex; gap: 16px; justify-content: center; }
+
+kbd {
+  display: inline-block; min-width: 24px; padding: 0 8px;
+  font: 700 var(--t12)/24px var(--font); text-align: center; letter-spacing: 0;
+  color: var(--text); background: var(--raised); border: var(--border); border-radius: var(--r);
+}
+
+.icon-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 8px;
+  background: var(--panel-bg); border: var(--border); border-radius: var(--r); color: var(--text);
+}
+.icon-btn svg { width: 24px; height: 24px; display: block; }
+.icon-btn.on { border-color: var(--magenta); }
+
+/* ---------- Top bar (menus only) ---------- */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 64px; padding: 12px 16px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(rgba(6, 10, 24, 0.85), rgba(6, 10, 24, 0));
+  z-index: 3; /* above the menu overlay, under the modals */
+}
+#ui:not(.idle) #topbar { display: none; }
+.fighter-chip {
+  display: inline-flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px 0 8px;
+  background: var(--panel-bg); border: var(--border); border-radius: var(--r);
+  font-size: var(--t12); letter-spacing: 1px; color: var(--dim);
+}
+.chip-swatch { width: 24px; height: 24px; border-radius: var(--r); background: var(--you); box-shadow: 0 0 0 1px var(--line); }
+.chip-name { font-size: var(--t16); font-weight: 700; letter-spacing: 2px; color: var(--you); }
+.chip-weapon b { color: var(--text); }
+.icons { display: flex; gap: 8px; }
+
+/* ---------- In-fight HUD: at the edges, the center stays clear ---------- */
+#hud { position: absolute; inset: 0; }
+#ui.idle #hud { visibility: hidden; }
+#ui.idle #pause-btn { display: none; }
+.side {
+  --id: var(--you);
+  position: absolute; bottom: 16px; width: 432px; padding: 12px 16px;
+  background: var(--panel-bg); border: var(--border); border-radius: var(--r);
+  border-bottom: 4px solid var(--id);
+}
+.side.left { left: 16px; }
+.side.right { right: 16px; --id: var(--foe); }
+
+/* Top: the HP plates, each from its screen edge to the clock. */
+.hptop { --id: var(--you); position: absolute; top: 12px; width: calc(50% - 192px); padding: 8px 16px 10px; background: var(--panel-bg); border: var(--border); border-radius: var(--r); border-top: 4px solid var(--id); }
+.hptop.left { left: 16px; }
+.hptop.right { right: 16px; --id: var(--foe); }
+.nameplate { display: flex; justify-content: space-between; align-items: flex-end; }
+.right .nameplate { flex-direction: row-reverse; }
+.who { display: flex; flex-direction: column; padding-left: 8px; border-left: 4px solid var(--id); }
+.right .who { padding: 0 8px 0 0; border-left: 0; border-right: 4px solid var(--id); text-align: right; }
+.pname { font-size: var(--t16); font-weight: 700; line-height: 16px; letter-spacing: 2px; color: var(--id); }
+.pweapon { margin-top: 4px; font-size: var(--t12); line-height: 12px; letter-spacing: 1px; color: var(--dim); }
+.hpnum { font-size: var(--t24); font-weight: 700; line-height: 24px; font-variant-numeric: tabular-nums; }
+
+.hpbar { position: relative; margin-top: 6px; height: 28px; background: var(--track); border: var(--border); overflow: hidden; transform: skewX(-20deg); }
+.right .hpbar { transform: scaleX(-1) skewX(-20deg); }
+.hpghost { position: absolute; top: 0; left: 0; height: 100%; width: 100%; background: var(--text); opacity: 0.45; }
+.hpfill { position: relative; height: 100%; width: 100%; background: var(--phosphor); transition: width 0.1s linear; }
+.right .hpfill { background: var(--foe); }
+.hpfill.low, .right .hpfill.low { background: var(--warn); }
+.hpfill.crit, .right .hpfill.crit { background: var(--danger); }
+
+.stats { position: relative; margin-top: 8px; display: flex; align-items: flex-end; gap: 16px; height: 32px; }
+.side.right .stats { flex-direction: row-reverse; }
+.stat { display: flex; align-items: baseline; gap: 4px; font-size: var(--t12); letter-spacing: 1px; color: var(--dim); white-space: nowrap; }
+.stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+.wpm b { font-size: var(--t32); line-height: 32px; }
+.power { position: static; } /* the COUNTER badge is placed on the panel's top edge */
+.power b { font-size: var(--t24); line-height: 24px; }
+.stun { align-self: center; font-size: var(--t16); font-weight: 700; letter-spacing: 2px; color: var(--danger); }
+/* COUNTER badge: sits on the panel's top edge and takes no space in the stats row. */
+.countertag { position: absolute; top: -11px; left: 24px; visibility: hidden; padding: 0 8px; border-radius: var(--r); font-size: var(--t12); line-height: 20px; letter-spacing: 1px; font-weight: 700; color: var(--bg); background: var(--magenta); white-space: nowrap; }
+.side.right .countertag { left: auto; right: 24px; }
+.countertag.on { visibility: visible; }
+
+.meters { margin-top: 8px; display: flex; align-items: center; gap: 16px; height: 16px; }
+.side.right .meters { flex-direction: row-reverse; }
+.combo { display: flex; align-items: center; gap: 8px; font-size: var(--t12); color: var(--dim); }
+.side.right .combo { flex-direction: row-reverse; }
+.combo b { display: inline-block; min-width: 32px; font-size: var(--t16); color: var(--id); font-variant-numeric: tabular-nums; }
+.combo.pop b { animation: pop 0.25s var(--ease); }
+@keyframes pop { from { transform: scale(1.5); } to { transform: scale(1); } }
+.combo.broke b { animation: broke 0.4s ease-out; }
+@keyframes broke { 0% { color: var(--danger); transform: translateX(-4px); } 25% { transform: translateX(4px); } 50% { transform: translateX(-2px); } 100% { transform: none; } }
+.pips { display: flex; gap: 4px; }
+.side.right .pips { flex-direction: row-reverse; }
+.pip { width: 16px; height: 12px; background: var(--track); transform: skewX(-20deg); }
+.pip.on { background: var(--id); }
+
+.ultrow { flex: 1; display: flex; align-items: center; gap: 8px; font-size: var(--t12); letter-spacing: 1px; color: var(--dim); }
+.side.right .ultrow { flex-direction: row-reverse; }
+.ultbar { flex: 1; height: 12px; background: var(--track); overflow: hidden; transform: skewX(-20deg); }
+.side.right .ultbar { transform: scaleX(-1) skewX(-20deg); }
+.ultfill { height: 100%; width: 0; background: var(--gold); opacity: 0.55; }
+.ultfill.ready { opacity: 1; }
+.ulttext { min-width: 128px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.side.right .ulttext { text-align: right; }
+.ulttext.ready { color: var(--gold); font-weight: 700; animation: pulse 0.5s ease-in-out infinite alternate; }
+@keyframes pulse { from { opacity: 0.6; } to { opacity: 1; } }
+
+/* Top center: the fight clock and your edge, a tug-of-war rope. The knot slides toward whoever is winning. */
+#center {
+  position: absolute; top: 12px; left: 50%; width: 352px; margin-left: -176px; padding: 6px 16px 8px;
+  text-align: center; background: var(--panel-bg); border: var(--border); border-radius: var(--r);
+}
+#timer { font-size: var(--t32); font-weight: 700; line-height: 32px; text-shadow: var(--outline); letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+#tug { position: relative; height: 24px; margin-top: 4px; }
+#tug::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 6px; background: var(--track); }
+#tug-mid { position: absolute; left: 50%; top: 2px; width: 2px; height: 20px; margin-left: -1px; background: var(--line); }
+#tug-fill { position: absolute; top: 9px; height: 6px; left: 50%; width: 0; background: var(--dim); }
+#tug-knot { position: absolute; top: 2px; left: 50%; width: 12px; height: 20px; margin-left: -6px; background: var(--text); transform: skewX(-20deg); transition: left 0.15s linear; }
+#tug.lead #tug-fill, #tug.lead #tug-knot { background: var(--you); }
+#tug.trail #tug-fill, #tug.trail #tug-knot { background: var(--foe); }
+#tug-row { display: flex; justify-content: center; align-items: baseline; gap: 8px; margin-top: 4px; }
+#tug-val { min-width: 80px; font-size: var(--t24); font-weight: 700; line-height: 24px; font-variant-numeric: tabular-nums; }
+#tug-label, #tug-unit { font-size: var(--t12); letter-spacing: 2px; color: var(--dim); }
+
+/* Pause sits inside the clock panel, at the right end of the edge row, so it never crowds the HP numbers
+   or covers the word plates. */
+#pause-btn { position: absolute; top: 80px; left: calc(50% + 176px - 58px); height: 28px; padding: 0 6px; gap: 4px; }
+#pause-btn svg { width: 16px; height: 16px; }
+#pause-btn kbd { min-width: 0; padding: 0 4px; line-height: 18px; }
+
+#countdown {
+  position: absolute; left: 0; right: 0; bottom: 48px;
+  text-align: center; font-size: var(--t64); line-height: 64px; font-weight: 700; letter-spacing: 4px; color: var(--text);
+  pointer-events: none; text-shadow: 3px 0 0 var(--magenta), -3px 0 0 rgba(77, 255, 154, 0.6), var(--outline);
+}
+#ui.classic #countdown { bottom: 216px; }
+
+/* ---------- Typing box (Classic view, Monkeytype style), bottom center between the panels ---------- */
+#typing-box { display: none; position: absolute; bottom: 16px; left: 50%; width: 438px; margin-left: -219px; padding: 16px 24px; }
+#ui.classic:not(.idle) #typing-box { display: block; }
+#words { height: 138px; overflow: hidden; position: relative; font-size: 28px; }
+#words-inner { position: relative; transition: transform 0.12s ease-out; }
+.word { display: inline-block; line-height: 46px; margin-right: 14px; vertical-align: top; color: var(--dim); }
+.word .ok { color: var(--text); }
+.word .bad { color: var(--danger); }
+.word .extra { color: #a8323e; }
+.word.wrong { border-bottom: 2px solid var(--danger); line-height: 44px; }
+.word.ult { color: #a8862a; }
+.word.ult::before { content: "ULT "; font-size: var(--t12); color: var(--gold); letter-spacing: 2px; vertical-align: top; }
+.word.ult .ok { color: var(--gold); }
+.word.ult .bad { color: var(--danger); }
+#caret {
+  position: absolute;
+  width: 3px; height: 34px;
+  background: var(--magenta);
+  transition: left 0.07s linear, top 0.1s ease-out;
+  animation: blink 1s steps(2, start) infinite;
+}
+#caret.typing { animation: none; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- Over-head view: the word plates are on the canvas; a thin progress line sits at the bottom ---------- */
+#word-progress { display: none; position: absolute; bottom: 24px; left: 50%; width: 400px; margin-left: -200px; height: 6px; background: var(--track); border: var(--border); overflow: hidden; }
+#word-progress-fill { height: 100%; width: 0; background: var(--you-letters); transition: width 0.07s linear; }
+#word-progress-fill.ult { background: var(--gold); }
+#ui:not(.classic):not(.idle) #word-progress { display: block; }
+
+/* ---------- Menus: panels floating over the live arena ---------- */
+.panel { background: var(--panel-bg); border: var(--border); border-radius: var(--r); }
+#overlay {
+  position: absolute; inset: 0; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  padding: 72px 24px 16px;
+  background: rgba(6, 10, 24, 0.72) repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+}
+#overlay.hidden { display: none; }
+/* Title: keep the middle of the arena clear for the sparring loop; darken only the two sides. */
+#overlay[data-screen="title"] {
+  justify-content: space-between;
+  background: linear-gradient(90deg, rgba(6, 10, 24, 0.8) 0, rgba(6, 10, 24, 0.1) 32%, rgba(6, 10, 24, 0.1) 66%, rgba(6, 10, 24, 0.8) 100%);
+}
+.screen { display: none; }
+#overlay[data-screen="title"] #scr-title,
+#overlay[data-screen="howto"] #scr-howto,
+#overlay[data-screen="fighter"] #scr-fighter,
+#overlay[data-screen="result"] #scr-result { display: grid; }
+.screen-title { margin: 0; font-size: var(--t24); font-weight: 700; letter-spacing: 4px; text-transform: uppercase; }
+.row-label { font-size: var(--t12); letter-spacing: 2px; color: var(--dim); text-transform: uppercase; padding-left: 8px; border-left: 4px solid transparent; }
+.row-label.active { color: var(--text); border-left-color: var(--magenta); }
+
+/* The key line: every chip is a button. */
+#keyline { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; font-size: var(--t12); color: var(--dim); }
+.key {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 6px; white-space: nowrap;
+  font-size: var(--t12); color: var(--dim); background: var(--panel-bg); border: var(--border); border-radius: var(--r);
+}
+.key b { color: var(--text); font-weight: 400; }
+
+/* Selectable cards: bots, swatches, weapons. Selected = magenta border on a raised panel. */
+.pick { border: var(--border); border-radius: var(--r); background: var(--surface); }
+.pick:hover { border-color: var(--dim); background: var(--raised); }
+.pick.sel { border-color: var(--magenta); background: var(--raised); box-shadow: inset 4px 0 0 var(--magenta); }
+
+/* Title: big stacked buttons on the left, opponents on the right, the sparring loop in the middle. */
+#scr-title { width: 100%; flex: 1; grid-template-columns: 352px 1fr 432px; align-items: center; gap: 24px; min-height: 0; }
+#title-left { display: grid; gap: 24px; align-content: center; }
+.logo { margin: 0; font-size: var(--t64); line-height: 64px; font-weight: 700; letter-spacing: 8px; text-shadow: var(--outline); }
+.logo span { display: block; }
+.logo .l1 { color: var(--text); text-shadow: 4px 0 0 var(--magenta), var(--outline); }
+.logo .l2 { color: var(--phosphor); text-shadow: 4px 0 0 rgba(255, 62, 165, 0.55), var(--outline); }
+#title-menu { display: grid; gap: 8px; }
+.mbtn {
+  display: flex; justify-content: space-between; align-items: center; height: 56px; padding: 0 16px 0 24px;
+  font-size: var(--t24); font-weight: 700; letter-spacing: 4px; text-transform: uppercase; text-align: left;
+  background: var(--panel-bg); border: var(--border); border-radius: var(--r);
+}
+.mbtn:hover { transform: translateX(4px); }
+.mbtn.primary { height: 96px; font-size: var(--t64); letter-spacing: 8px; }
+.mbtn .sub { display: block; font-size: var(--t12); letter-spacing: 1px; font-weight: 400; text-transform: none; }
+.mbtn.primary .sub { color: rgba(6, 10, 24, 0.8); }
+
+#title-left { grid-column: 1; }
+#title-bots { grid-column: 3; padding: 16px; display: grid; gap: 8px; align-self: center; }
+.card-label { display: flex; justify-content: space-between; font-size: var(--t12); letter-spacing: 2px; color: var(--dim); text-transform: uppercase; }
+.bot-opt {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  min-height: 56px; padding: 6px 12px; text-align: left; color: var(--dim); font-size: var(--t12);
+}
+.bot-opt .bname { display: block; font-size: var(--t16); font-weight: 700; color: var(--text); letter-spacing: 1px; }
+.bot-opt .bname i { margin-left: 12px; font-style: normal; font-size: var(--t12); font-weight: 400; letter-spacing: 0; color: var(--dim); }
+.bot-opt .bstyle { display: block; margin-top: 2px; }
+.bot-opt .beat { text-align: right; line-height: 1.2; }
+.bot-opt .beat b { display: block; font-size: var(--t24); color: var(--text); font-variant-numeric: tabular-nums; }
+.bot-opt.match .bname { color: var(--info); }
+
+/* How to play */
+#scr-howto { width: 896px; padding: 24px; grid-template-columns: 1fr 1fr; gap: 16px 32px; }
+#scr-howto .screen-title, #scr-howto .btn-row { grid-column: 1 / -1; }
+.group h3 { margin: 0 0 8px; font-size: var(--t16); font-weight: 700; color: var(--text); padding-left: 8px; border-left: 4px solid var(--magenta); }
+.group p { margin: 0 0 8px; font-size: var(--t12); line-height: 1.6; color: var(--dim); max-width: 60ch; }
+.group p b { color: var(--text); }
+.group.ult h3 { border-left-color: var(--gold); }
+.wtable { width: 100%; border-collapse: collapse; font-size: var(--t12); color: var(--dim); }
+.wtable td { padding: 4px 8px 4px 0; vertical-align: top; line-height: 1.5; }
+.wtable td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
+
+/* Loadout: your fighter large on the left, the pickers on the right. */
+#scr-fighter { grid-template-columns: 448px 544px; gap: 16px; align-items: stretch; }
+#loadout-stage { position: relative; padding: 0; overflow: hidden; display: grid; background: var(--surface); }
+#fighter-preview { width: 446px; height: 520px; display: block; }
+#loadout-tag { position: absolute; left: 16px; right: 16px; bottom: 16px; display: flex; justify-content: space-between; align-items: baseline; text-shadow: var(--outline); }
+#fighter-name { font-size: var(--t24); font-weight: 700; letter-spacing: 4px; }
+#fighter-wname { font-size: var(--t16); font-weight: 700; letter-spacing: 2px; }
+#loadout-side { padding: 24px; display: grid; gap: 16px; align-content: start; }
+#swatches { display: grid; grid-template-columns: repeat(5, 48px); gap: 16px; padding: 4px 8px; }
+.swatch { position: relative; width: 48px; height: 48px; padding: 0; border-radius: var(--r); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--line); transition: transform 0.2s var(--ease); }
+.swatch:hover { transform: scale(1.06); }
+.swatch.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--magenta); transform: scale(1.1); }
+.swatch.saved::after { content: ""; position: absolute; left: 50%; bottom: -12px; width: 4px; height: 4px; margin-left: -2px; background: var(--dim); }
+#fighter-namerow { display: flex; align-items: baseline; gap: 16px; padding-left: 8px; min-height: 24px; }
+#fighter-sample { font-size: var(--t24); font-weight: 700; }
+#fighter-sample .untyped { color: #c9d0ee; }
+#fighter-note { font-size: var(--t12); color: var(--dim); }
+#weapons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.weapon { position: relative; padding: 8px 12px; text-align: left; display: grid; gap: 4px; align-content: start; color: var(--dim); }
+.weapon .wname { font-size: var(--t12); letter-spacing: 1px; color: var(--dim); }
+.weapon .wname b { display: block; font-size: var(--t16); color: var(--text); letter-spacing: 1px; }
+.weapon .wline { font-size: var(--t12); line-height: 1.5; color: var(--dim); }
+.weapon .wsample { font-size: var(--t16); font-weight: 700; color: #c9d0ee; }
+.weapon.saved::after { content: ""; position: absolute; right: 8px; top: 8px; width: 4px; height: 4px; background: var(--dim); }
+#fighter-btns { justify-content: flex-end; margin-top: 8px; }
+
+/* Result screen */
+#scr-result { width: 704px; gap: 12px; }
+#ko-card { padding: 12px 24px 8px; text-align: center; }
+#ko-title { font-size: var(--t64); line-height: 64px; font-weight: 700; letter-spacing: 8px; }
+#ko-title.win { color: var(--phosphor); text-shadow: 4px 0 0 var(--magenta); }
+#ko-title.lose { color: var(--danger); text-shadow: 4px 0 0 rgba(124, 227, 255, 0.45); }
+#ko-sub { margin-top: 4px; font-size: var(--t12); letter-spacing: 2px; color: var(--dim); }
+#result-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rcol { padding: 8px 16px; border-top: 4px solid var(--id); }
+.rcol h3 { margin: 0 0 8px; font-size: var(--t16); letter-spacing: 2px; color: var(--id); }
+.rcol dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; font-size: var(--t12); }
+.rcol dt { color: var(--dim); }
+.rcol dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+#wpm-chart { padding: 8px 16px; }
+#wpm-chart svg { display: block; width: 100%; height: 64px; margin-top: 8px; overflow: visible; }
+#wpm-chart .chart-head { display: flex; justify-content: space-between; font-size: var(--t12); color: var(--dim); }
+#wpm-chart .key-i { display: inline-flex; align-items: center; gap: 8px; margin-left: 16px; }
+#wpm-chart .key-i i { display: inline-block; width: 16px; height: 2px; }
+#result-bots { padding: 8px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+#result-bots .card-label { grid-column: 1 / -1; padding-left: 4px; }
+.bot-chip { height: 40px; padding: 0 4px; display: grid; place-content: center; text-align: center; font-size: var(--t12); color: var(--dim); line-height: 1.2; }
+.bot-chip b { color: var(--text); font-size: var(--t12); letter-spacing: 1px; }
+
+/* ---------- Modals: pause, settings, confirm ---------- */
+#modal {
+  position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 10, 24, 0.7) repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+}
+#modal.hidden { display: none; }
+.modal { display: none; padding: 24px; }
+#modal[data-top="pause"] #mod-pause,
+#modal[data-top="settings"] #mod-settings,
+#modal[data-top="confirm"] #mod-confirm { display: grid; }
+#mod-pause { width: 416px; gap: 8px; }
+#mod-pause .screen-title { margin-bottom: 8px; }
+#mod-pause .mbtn { height: 56px; font-size: var(--t24); }
+#mod-pause .mbtn.primary { height: 72px; font-size: var(--t32); }
+.modal-note { margin: 8px 0 0; font-size: var(--t12); line-height: 1.6; color: var(--dim); }
+#mod-confirm { width: 448px; gap: 16px; }
+#mod-confirm p { margin: 0; font-size: var(--t12); line-height: 1.6; color: var(--dim); }
+
+#mod-settings { width: 672px; gap: 16px; }
+.tabs { display: flex; gap: 8px; border-bottom: var(--border); }
+.tab {
+  display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; margin-bottom: -1px;
+  font-size: var(--t16); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--dim);
+  background: transparent; border: 1px solid transparent; border-radius: var(--r) var(--r) 0 0; cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab.sel { color: var(--text); background: var(--raised); border-color: var(--line); border-bottom-color: var(--raised); box-shadow: inset 0 3px 0 var(--magenta); }
+.set-rows { display: grid; gap: 8px; min-height: 248px; align-content: start; }
+.set-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; min-height: 56px; padding: 8px 12px;
+  border-left: 4px solid transparent; border-radius: var(--r); background: rgba(18, 26, 58, 0.4);
+}
+.set-row.focus { border-left-color: var(--magenta); background: var(--raised); }
+.set-row .lbl { font-size: var(--t16); font-weight: 700; }
+.set-row .hint { display: block; margin-top: 4px; font-size: var(--t12); color: var(--dim); font-weight: 400; }
+.segs { display: inline-flex; gap: 4px; }
+.seg {
+  height: 36px; min-width: 64px; padding: 0 12px; font-size: var(--t12); font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--dim); background: var(--surface); border: var(--border); border-radius: var(--r);
+}
+.seg.sel { color: var(--bg); background: var(--magenta); border-color: var(--magenta); }
+.keys-table { width: 100%; border-collapse: collapse; font-size: var(--t12); color: var(--dim); }
+.keys-table td { padding: 6px 8px; border-bottom: 1px solid rgba(42, 58, 115, 0.5); vertical-align: middle; }
+.keys-table td:first-child { width: 160px; color: var(--text); }
+.keys-table kbd { margin-right: 4px; }
+
+#toast {
+  position: absolute; z-index: 5; left: 50%; bottom: 96px; transform: translateX(-50%); max-width: 640px; padding: 12px 16px;
+  font-size: var(--t12); line-height: 1.5; color: var(--text); background: var(--surface); border: 1px solid var(--warn); border-radius: var(--r);
+  opacity: 0; transition: opacity 0.2s var(--ease); pointer-events: none;
+}
+#toast.on { opacity: 1; }
+
+/* Reduce motion: the system setting, or the game setting (main.js adds .reduce-motion to #ui). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { animation: none !important; transition: none !important; }

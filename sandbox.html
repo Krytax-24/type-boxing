@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Type Boxing - Combo Sandbox</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game">
+    <div id="stage">
+      <canvas id="arena" width="960" height="540"></canvas>
+
+      <div id="hud-left">
+        <div id="hits"><span id="hits-count">0</span> <span class="small">HITS</span></div>
+        <div id="rank-row">
+          <div id="rank">D</div>
+          <div id="style-bar"><div id="style-fill"></div></div>
+        </div>
+      </div>
+
+      <div id="hud-right">
+        <div>WPM <b id="stat-wpm">0</b></div>
+        <div>CLEAN <b id="stat-chain">0</b></div>
+        <div>DAMAGE <b id="stat-damage">0</b></div>
+        <div>BEST <b id="stat-best">0</b></div>
+      </div>
+
+      <div id="overlay">
+        <div id="overlay-title">TYPE BOXING</div>
+        <div id="overlay-mode">COMBO SANDBOX</div>
+        <div id="overlay-sub">Press Enter to start</div>
+        <div id="overlay-help">Type the words to fight. Mistakes break your clean chain.<br>Esc returns to this screen.</div>
+      </div>
+    </div>
+
+    <div id="prompt">
+      <div id="prompt-now">
+        <div id="prompt-tag"></div>
+        <div id="prompt-text"></div>
+      </div>
+      <div id="prompt-next"></div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/typing.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/sandbox.js"></script>
+</body>
+</html>

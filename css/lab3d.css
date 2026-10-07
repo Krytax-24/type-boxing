@@ -1,0 +1,56 @@
+/* 3D Lab: a dark arcade test page. The canvas renders at a low resolution and is scaled up with hard pixels. */
+:root {
+  --bg: #060a18; --surface: #0b1129; --raised: #121a3a; --line: #2a3a73; --text: #e8edff; --dim: #8d9ac8;
+  --phosphor: #4dff9a; --magenta: #ff3ea5; --gold: #ffc53d; --danger: #ff4d5e; --info: #7ce3ff;
+  --font: "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 13px/1.45 var(--font); overflow: hidden; }
+#view { position: fixed; inset: 0; display: block; image-rendering: pixelated; image-rendering: crisp-edges; }
+#hud { position: fixed; inset: 0; pointer-events: none; }
+.plate { position: absolute; top: 16px; width: calc(50% - 72px); }
+.p1 { left: 24px; } .p2 { right: 24px; text-align: right; }
+.nm { font-weight: 700; font-size: 16px; letter-spacing: 0.06em; text-shadow: 0 2px 0 #000; }
+.bar { position: relative; height: 16px; margin-top: 4px; background: #1a1f36; border: 1px solid var(--line); }
+.p2 .bar { transform: scaleX(-1); }
+.bar .fill, .bar .ghost { position: absolute; left: 0; top: 0; bottom: 0; }
+.bar .ghost { background: #c23a4a; transition: width 0.6s ease 0.25s; }
+.bar .fill { background: var(--phosphor); }
+.meter { position: relative; height: 6px; margin-top: 4px; width: 60%; background: #1a1f36; border: 1px solid var(--line); }
+.p2 .meter { margin-left: auto; transform: scaleX(-1); }
+.meter div { position: absolute; left: 0; top: 0; bottom: 0; background: var(--info); }
+.meter div.full { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+#banner { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font-size: 44px; font-weight: 700; letter-spacing: 0.12em; color: var(--gold); text-shadow: 0 3px 0 #000, 0 0 18px rgba(255, 197, 61, 0.6); opacity: 0; transform: scale(0.9); transition: opacity 0.15s, transform 0.15s; }
+#banner.on { opacity: 1; transform: scale(1); }
+/* A soft vignette and a full screen flash for supers. */
+#grade { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.5) 100%); }
+#flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; }
+#flash.on { animation: flash 0.35s ease-out; }
+@keyframes flash { from { opacity: 0.55; } to { opacity: 0; } }
+#moves .row.sup .cmd { color: var(--magenta); }
+#combo { position: absolute; left: 24px; top: 72px; font-size: 28px; font-weight: 700; color: var(--gold); text-shadow: 0 3px 0 #000; }
+#combo small { display: block; font-size: 13px; color: var(--text); }
+#info { position: absolute; left: 24px; bottom: 20px; max-width: 46%; padding: 8px 12px; background: rgba(11, 17, 41, 0.82); border: 1px solid var(--line); border-radius: 4px; }
+#info b { color: var(--info); }
+#info .lv { display: inline-block; min-width: 18px; padding: 0 4px; margin-right: 2px; border-radius: 2px; color: #111; font-weight: 700; text-align: center; }
+.lv.H { background: #ffcf4d; } .lv.M { background: #7ce3ff; } .lv.L { background: #ff8a3d; }
+#status { position: absolute; right: 24px; bottom: 20px; text-align: right; color: var(--dim); text-shadow: 0 1px 0 #000; }
+.panel { position: fixed; background: rgba(11, 17, 41, 0.94); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; overflow: auto; }
+.hidden { display: none; }
+#moves { right: 24px; top: 64px; bottom: 64px; width: 470px; pointer-events: auto; }
+#moves h2 { margin: 0 0 2px; font-size: 16px; color: var(--phosphor); }
+#moves h3 { margin: 14px 0 6px; font-size: 12px; color: var(--dim); letter-spacing: 0.1em; text-transform: uppercase; }
+#moves .row { display: grid; grid-template-columns: 26px 92px 1fr 52px 40px; gap: 6px; align-items: center; padding: 3px 4px; border-radius: 3px; }
+#moves .row:hover { background: var(--raised); }
+#moves .cmd { color: var(--gold); }
+#moves .fd { color: var(--dim); text-align: right; font-size: 12px; }
+#moves button, #help button { font: inherit; color: var(--text); background: var(--raised); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; padding: 0 6px; }
+#moves button:hover { border-color: var(--magenta); }
+#moves button:active { transform: translateY(1px); }
+#moves .str { grid-template-columns: 26px 1fr; padding: 4px 4px 8px; }
+#moves .str .cmd { word-break: break-word; }
+#moves .sub { color: var(--dim); font-size: 12px; }
+#help { left: 24px; top: 120px; width: 330px; color: var(--dim); }
+#help b { color: var(--text); }
+#help kbd { display: inline-block; min-width: 18px; padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); color: var(--text); text-align: center; font: inherit; }
+@media (prefers-reduced-motion: reduce) { .bar .ghost { transition: none; } #flash.on { animation: none; } #banner { transition: none; } }

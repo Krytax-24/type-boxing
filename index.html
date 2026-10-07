@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Type Boxing</title>
+  <meta name="description" content="A real time typing fighting game: type faster than your opponent to hit, guard and land your ultimate.">
+  <link rel="stylesheet" href="css/duel.css">
+</head>
+<body>
+  <!-- The arena fills the whole window. Everything else floats over it in #ui, which main.js scales
+       from a 1366 x 768 design size to the window (fitUi). -->
+  <canvas id="arena"></canvas>
+
+  <div id="ui" class="idle">
+    <!-- Top bar on the menus: your fighter on the left, settings and fullscreen on the right. -->
+    <header id="topbar">
+      <button class="fighter-chip" data-act="fighter" tabindex="-1" aria-label="Your fighter">
+        <span class="chip-swatch"></span><span class="chip-name">YOU</span><span class="chip-color"></span><span class="chip-weapon"></span>
+      </button>
+      <div class="icons">
+        <button class="icon-btn" data-act="settings" tabindex="-1" aria-label="Settings" title="Settings (S)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4l.6 3 2.2 1.3 2.9-1 2 3.4-2.3 2v2.6l2.3 2-2 3.4-2.9-1-2.2 1.3-.6 3h-4l-.6-3-2.2-1.3-2.9 1-2-3.4 2.3-2v-2.6l-2.3-2 2-3.4 2.9 1L9.4 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <button class="icon-btn" data-act="fullscreen" tabindex="-1" aria-label="Fullscreen" title="Fullscreen (F)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- In-fight HUD, versus style: your HP bar top-left, the clock and the edge rope top-center, the bot's HP bar
+         top-right (mirrored). WPM, power, combo and ultimate sit in each player's bottom corner. -->
+    <div id="hud">
+      <div class="hptop left" id="hp1"></div>
+      <div id="center">
+        <div id="timer">0:00</div>
+        <div id="tug"><div id="tug-fill"></div><div id="tug-mid"></div><div id="tug-knot"></div></div>
+        <div id="tug-row"><span id="tug-label">EDGE</span><span id="tug-val">0.0</span><span id="tug-unit">HP/S</span></div>
+      </div>
+      <div class="hptop right" id="hp2"></div>
+      <div class="side left" id="p1"></div>
+      <div class="side right" id="p2"></div>
+      <button id="pause-btn" class="icon-btn" data-act="pause" tabindex="-1" aria-label="Pause" title="Pause (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></svg>
+        <kbd>Esc</kbd>
+      </button>
+    </div>
+
+    <div id="countdown"></div>
+
+    <!-- Over-head view: a thin line for your progress through the current word. -->
+    <div id="word-progress"><div id="word-progress-fill"></div></div>
+    <!-- Classic view: the Monkeytype style typing box. -->
+    <div id="typing-box" class="panel">
+      <div id="words">
+        <div id="words-inner"><div id="caret"></div></div>
+      </div>
+    </div>
+
+    <!-- Menus. main.js shows one screen at a time and fills it from CONFIG. -->
+    <div id="overlay">
+      <section id="scr-title" class="screen">
+        <div id="title-left">
+          <h1 class="logo" aria-label="Type Boxing"><span class="l1">TYPE</span><span class="l2">BOXING</span></h1>
+          <nav id="title-menu"></nav>
+        </div>
+        <div id="title-bots" class="panel"></div>
+      </section>
+
+      <section id="scr-howto" class="screen panel"></section>
+
+      <section id="scr-fighter" class="screen">
+        <div id="loadout-stage" class="panel">
+          <canvas id="fighter-preview"></canvas>
+          <div id="loadout-tag"><span id="fighter-name"></span><span id="fighter-wname"></span></div>
+        </div>
+        <div id="loadout-side" class="panel">
+          <h2 class="screen-title">Loadout</h2>
+          <div class="row-label" id="label-color">Color</div>
+          <div id="swatches"></div>
+          <div id="fighter-namerow"><span id="fighter-sample"></span><span id="fighter-note"></span></div>
+          <div class="row-label" id="label-weapon">Weapon</div>
+          <div id="weapons"></div>
+          <div class="btn-row" id="fighter-btns"></div>
+        </div>
+      </section>
+
+      <section id="scr-result" class="screen">
+        <div id="ko-card" class="panel">
+          <div id="ko-title"></div>
+          <div id="ko-sub"></div>
+        </div>
+        <div id="result-cols"></div>
+        <div id="wpm-chart" class="panel"></div>
+        <div id="result-bots" class="panel"></div>
+        <div class="btn-row" id="result-btns"></div>
+      </section>
+
+      <div id="keyline"></div>
+    </div>
+
+    <!-- Modals: pause, settings and the quit confirm, stacked over the screen or the fight. -->
+    <div id="modal" class="hidden">
+      <section id="mod-pause" class="modal panel"></section>
+      <section id="mod-settings" class="modal panel"></section>
+      <section id="mod-confirm" class="modal panel"></section>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/words.js"></script>
+  <script src="js/duel-typing.js"></script>
+  <script src="js/fighter.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/duel.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

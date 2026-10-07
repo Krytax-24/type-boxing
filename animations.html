@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Type Boxing Animation Lab</title>
+  <meta name="description" content="A test page for fighter movement and animations, played with the keyboard.">
+  <link rel="stylesheet" href="css/anim-lab.css">
+</head>
+<body data-bg="studio">
+  <!-- Animation Lab: a test tool for the fighter animations. It does not touch the game. -->
+  <canvas id="stage"></canvas>
+
+  <aside id="panel">
+    <div class="eyebrow">Animation Lab, for testing</div>
+    <h1 id="char-name">IRON VANGUARD</h1>
+    <div id="char-sub"></div>
+    <div id="roster"></div>
+    <table class="keys">
+      <tr><td><kbd>1</kbd> to <kbd>6</kbd></td><td>character</td><td><kbd>C</kbd></td><td>compare with the next one</td></tr>
+      <tr><td><kbd>Left</kbd> <kbd>Right</kbd></td><td>walk (hold)</td><td><kbd>Shift</kbd></td><td>+ hold: run</td></tr>
+      <tr><td>tap twice</td><td>dash, back dash</td><td><kbd>Down</kbd></td><td>crouch (hold)</td></tr>
+      <tr><td><kbd>Space</kbd> <kbd>Up</kbd></td><td>jump (hold: higher)</td><td><kbd>X</kbd></td><td>lock-on or free facing</td></tr>
+      <tr><td><kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd></td><td>attacks 1 to 4</td><td><kbd>Q</kbd></td><td>combo sequence</td></tr>
+      <tr><td><kbd>E</kbd> <kbd>H</kbd></td><td>parry, get hit</td><td><kbd>T</kbd> <kbd>K</kbd></td><td>taunt, death</td></tr>
+      <tr class="sep"><td><kbd>M</kbd></td><td>turn (free facing)</td><td></td><td>attack again after a hit lands: chain</td></tr>
+      <tr><td><kbd>Z</kbd></td><td>slow motion</td><td><kbd>P</kbd> <kbd>.</kbd></td><td>pause, step a frame</td></tr>
+      <tr><td><kbd>V</kbd></td><td>sheet pages</td><td><kbd>Enter</kbd></td><td>demo reel</td></tr>
+      <tr><td><kbd>L</kbd> <kbd>O</kbd></td><td>repeat, onion skin</td><td><kbd>R</kbd></td><td>reset, get up</td></tr>
+      <tr><td><kbd>N</kbd> <kbd>B</kbd></td><td>dummy, background</td><td><kbd>U</kbd></td><td>sound on or off</td></tr>
+      <tr><td><kbd>`</kbd></td><td>hide this panel</td><td></td><td>attack in the air: air attack</td></tr>
+    </table>
+  </aside>
+
+  <footer id="status">
+    <div class="row"><span id="st-clip"></span><span id="st-frame"></span></div>
+    <div id="st-track"><div id="st-bar"></div><div id="st-ticks"></div></div>
+    <div id="st-flags"></div>
+  </footer>
+
+  <script src="js/anim-rig.js"></script>
+  <script src="js/anim-clips.js"></script>
+  <script src="js/anim-move.js"></script>
+  <script src="js/anim-chars.js"></script>
+  <script src="js/anim-lab.js"></script>
+</body>
+</html>
