@@ -424,7 +424,7 @@ function renderTitle() {
   const cfg = botCfgFor(botIndex);
   $("title-menu").innerHTML =
     mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, about ${Math.round(cfg.beatAt)} wpm`) +
-    mbtn("fighter", "Fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("settings", "Settings", "S");
+    mbtn("history", "Match History", "H") + mbtn("fighter", "Fighter", "C") + mbtn("howto", "How to play", "L") + mbtn("settings", "Settings", "S");
   $("title-bots").innerHTML = `<div class="card-label"><span>Opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
   keyline([keyBtn("nextbot", botKeys(), "bot"), keyBtn("view", "F2", "view: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
   applyLooks();
@@ -488,9 +488,37 @@ function avgWpm(t) {
   const s = t.stats, secs = Math.max(s.lastKeyAt - (s.firstKeyAt || 0), 1);
   return Math.round(s.correct / 5 / (secs / 60));
 }
-function accuracy(t) {
+function accuracyPct(t) {
   const s = t.stats, n = s.correct + s.wrong;
-  return n ? Math.round((s.correct / n) * 100) + "%" : "-";
+  return n ? Math.round((s.correct / n) * 100) : 0;
+}
+function accuracy(t) {
+  const n = t.stats.correct + t.stats.wrong;
+  return n ? accuracyPct(t) + "%" : "-";
+}
+function resultRecFor(t, name) {
+  return {
+    name,
+    weapon: t.weapon.id,
+    wpm: avgWpm(t),
+    accuracy: accuracyPct(t),
+    bestCombo: t.stats.bestCombo,
+    ultimates: t.stats.ultimates,
+    correct: t.stats.correct,
+    wrong: t.stats.wrong,
+    words: t.stats.words,
+  };
+}
+function saveMatchResult(youWon) {
+  if (typeof MatchHistory === "undefined") return false;
+  return MatchHistory.add({
+    won: youWon,
+    seconds: +duel.t.toFixed(1),
+    bot: botCfg.name,
+    botBeatAt: Math.round(botCfg.beatAt),
+    you: resultRecFor(duel.typists[0], "YOU"),
+    foe: resultRecFor(duel.typists[1], botCfg.name),
+  });
 }
 
 // A small WPM-over-time line for both players (SVG, drawn from wpmTrace).
@@ -515,6 +543,7 @@ function wpmChart() {
 function showResult() {
   showScreen("result");
   const youWon = duel.result.winner === 0;
+  saveMatchResult(youWon);
   $("ko-title").className = youWon ? "win" : "lose";
   $("ko-title").textContent = youWon ? "YOU WIN" : "YOU LOSE";
   $("ko-sub").textContent = `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (beat it at about ${Math.round(botCfg.beatAt)} wpm)`;
