@@ -211,10 +211,10 @@ const CONFIG = {
     uiMinScale: 0.7, uiMaxScale: 2.5,
   },
 
-  // Player settings (visual only), saved in localStorage. The view keeps its own key (wordPlate.storageKey).
+  // Player settings, saved in localStorage. The view keeps its own key (wordPlate.storageKey).
   settings: {
     storageKey: "typeboxing.settings",
-    defaults: { reduceMotion: false, shake: 1, damageNumbers: true, sound: true, volume: 0.7 },
+    defaults: { reduceMotion: false, shake: 1, damageNumbers: true, sound: true, volume: 0.7, wordSubmit: true },
     shakeSteps: [[0, "Off"], [0.5, "Low"], [1, "Normal"], [1.5, "Strong"]],
     volumeSteps: [[0.3, "Low"], [0.5, "Medium"], [0.7, "High"], [1, "Max"]],
   },
