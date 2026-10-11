@@ -29,24 +29,28 @@ class TypingStream {
 
   // One keystroke. Returns a list of events:
   //   { type: "correct" } | { type: "wrong" } | { type: "word", word, clean, ultimate }
+  submit(countKey = true) {
+    const w = this.current();
+    const events = [];
+    if (this.typed.length === 0) return events; // submit on an empty word does nothing
+    const exact = this.typed === w.text;
+    const clean = exact && this.wordErrors === 0;
+    if (countKey) events.push({ type: exact ? "correct" : "wrong" });
+    w.clean = clean;
+    w.typedFinal = this.typed;
+    events.push({ type: "word", word: w, clean, ultimate: w.ultimate });
+    this.index++;
+    this.typed = "";
+    this.wordErrors = 0;
+    if (this.words.length - this.index < 40) this.extend();
+    return events;
+  }
+
   press(ch) {
     const w = this.current();
     const events = [];
 
-    if (ch === " ") {
-      if (this.typed.length === 0) return events; // space on an empty word does nothing
-      const exact = this.typed === w.text;
-      const clean = exact && this.wordErrors === 0;
-      events.push({ type: exact ? "correct" : "wrong" });
-      w.clean = clean;
-      w.typedFinal = this.typed;
-      events.push({ type: "word", word: w, clean, ultimate: w.ultimate });
-      this.index++;
-      this.typed = "";
-      this.wordErrors = 0;
-      if (this.words.length - this.index < 40) this.extend();
-      return events;
-    }
+    if (ch === " ") return this.submit(true);
 
     if (this.typed.length >= w.text.length + 5) return events; // too many extra letters
     const ok = ch === w.text[this.typed.length];

@@ -59,6 +59,19 @@ console.log("Rules");
   duel.typists[1].hp = 0.5; duel.damage(1, 1);
   check("reaching 0 HP ends the match", duel.phase === "over" && duel.result.winner === 0);
 
+  const auto = new g.Duel(); auto.start(13); fight(g, auto);
+  const s = auto.streams[0], w = s.current().text;
+  for (const ch of w) s.press(ch);
+  const cleanAuto = s.submit(false);
+  check("auto-submit advances a completed clean word without a phantom key", s.index === 1 &&
+    cleanAuto.length === 1 && cleanAuto[0].type === "word" && cleanAuto[0].clean);
+  const dirty = s.current().text;
+  s.press(dirty[0] === "z" ? "y" : "z");
+  for (let i = 1; i < dirty.length; i++) s.press(dirty[i]);
+  const dirtyAuto = s.submit(false);
+  check("auto-submit advances a completed dirty word", s.index === 2 &&
+    dirtyAuto.length === 1 && dirtyAuto[0].type === "word" && !dirtyAuto[0].clean);
+
   const src = fs.readFileSync(path.join(root, "js", "duel.js"), "utf8");
   check("duel.js has no Math.random, clock, keyboard or bot", !/Math\.random|performance\.now|Date\.now|keydown|new Bot/.test(src));
 }

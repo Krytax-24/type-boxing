@@ -156,7 +156,7 @@ function setPanelChar(i, key, w) {
   p.pips = [...p.pipBox.querySelectorAll(".pip")];
 }
 
-// ---------- Settings (visual only), saved in localStorage inside try/catch ----------
+// ---------- Settings, saved in localStorage inside try/catch ----------
 const SET = CONFIG.settings;
 const settings = Object.assign({}, SET.defaults);
 let savedSettings = null;
@@ -587,6 +587,8 @@ const SETTINGS_TABS = [
   { name: "Game", rows: [
     { id: "view", label: "View", hint: "Over-head: words float over the fighters. Classic: a typing box.",
       opts: [["overhead", "Over-head"], ["classic", "Classic"]], get: () => viewMode, set: (v) => setView(v) },
+    { id: "wordSubmit", label: "Word submit", hint: "On: Space or Enter ends a word. Off: a full word advances by itself.",
+      opts: [[true, "On"], [false, "Off"]], get: () => settings.wordSubmit, set: (v) => { settings.wordSubmit = v; } },
     { id: "damageNumbers", label: "Damage numbers", hint: "The net HP numbers beside each fighter.",
       opts: [[true, "On"], [false, "Off"]], get: () => settings.damageNumbers, set: (v) => { settings.damageNumbers = v; } },
   ] },
@@ -606,8 +608,9 @@ const SETTINGS_TABS = [
   ] },
   { name: "Controls", rows: [] },
 ];
-const KEY_ROWS = [
-  ["Typing", "Letters type, <kbd>Space</kbd> ends a word, <kbd>Backspace</kbd> fixes a letter"],
+function keyRows() { return [
+  ["Typing", settings.wordSubmit ? "Letters type, <kbd>Space</kbd> or <kbd>Enter</kbd> ends a word, <kbd>Backspace</kbd> fixes a letter" :
+    "Letters type, full words submit automatically, <kbd>Backspace</kbd> fixes a letter before the word is full"],
   ["Pause", "<kbd>Esc</kbd> in a fight (leaving the tab pauses too)"],
   ["Pause menu", "<kbd>Esc</kbd> resume, <kbd>R</kbd> restart, <kbd>S</kbd> settings, <kbd>Q</kbd> quit"],
   ["Title and result", "<kbd>Enter</kbd> fight, <kbd>1</kbd> to <kbd>7</kbd> bot, <kbd>C</kbd> fighter, <kbd>H</kbd> how to play"],
@@ -615,7 +618,7 @@ const KEY_ROWS = [
   ["Fighter", "<kbd>Left</kbd> <kbd>Right</kbd> pick, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Enter</kbd> confirm, <kbd>Esc</kbd> back"],
   ["Settings", "<kbd>1</kbd> to <kbd>4</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
   ["Mouse", "Click any button or key chip. Typing stays on the keyboard."],
-];
+]; }
 
 function openSettings() {
   if (topModal() === "settings") return;
@@ -636,7 +639,7 @@ function renderSettings() {
       return `<div class="set-row ${ri === setRow ? "focus" : ""}"><span class="lbl">${r.label}<span class="hint">${hint}</span></span><span class="segs">${segs}</span></div>`;
     }).join("");
   } else {
-    body = `<table class="keys-table">${KEY_ROWS.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
+    body = `<table class="keys-table">${keyRows().map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
   }
   $("mod-settings").innerHTML = `<h2 class="screen-title">Settings</h2><div class="tabs">${tabs}</div>` +
     `<div class="set-rows">${body}</div><div class="btn-row">${btn("back", "Back", "Esc", "primary")}</div>`;
@@ -762,6 +765,14 @@ function modalKey(top, e) {
   }
 }
 
+function handlePlayerTyping(evs) {
+  duel.handleEvents(0, evs, duel.t);
+  // Typing sounds: a soft click per right key, a dull knock per typo (the word strikes sound from the fighters).
+  if (evs.some((v) => v.type === "wrong")) Sfx.play("typo");
+  else if (evs.some((v) => v.type === "correct" || v.type === "word")) Sfx.play("key");
+  view.update();
+}
+
 window.addEventListener("keydown", (e) => {
   Sfx.unlock(); // browsers allow audio only after a key or a click
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -775,17 +786,20 @@ window.addEventListener("keydown", (e) => {
     return;
   }
   if (e.key === "Escape") { e.preventDefault(); act("pause"); return; }
-  if (e.key === "Backspace" || e.key === " " || e.key === "Tab" || e.key.length === 1) e.preventDefault();
+  if (e.key === "Backspace" || e.key === " " || e.key === "Enter" || e.key === "Tab" || e.key.length === 1) e.preventDefault();
   if (duel.phase !== "fight") return; // countdown: keys are ignored
 
   if (e.key === "Backspace") { duel.streams[0].backspace(); view.update(); return; }
+  if (e.key === " " || e.key === "Enter") {
+    const evs = duel.streams[0].submit(true);
+    handlePlayerTyping(evs);
+    return;
+  }
   if (e.key.length === 1) {
     const evs = duel.streams[0].press(e.key.toLowerCase());
-    duel.handleEvents(0, evs, duel.t);
-    // Typing sounds: a soft click per right key, a dull knock per typo (the word strikes sound from the fighters).
-    if (evs.some((v) => v.type === "wrong")) Sfx.play("typo");
-    else if (evs.some((v) => v.type === "correct" || v.type === "word")) Sfx.play("key");
-    view.update();
+    const s = duel.streams[0], w = s.current();
+    if (!settings.wordSubmit && s.typed.length >= w.text.length) evs.push(...s.submit(false));
+    handlePlayerTyping(evs);
   }
 });
 
