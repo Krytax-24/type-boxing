@@ -154,48 +154,47 @@ const CONFIG = {
     },
     // Counter: a mistake while your combo is 1 or higher gives the OTHER typist a short power boost.
     counter: { powerBonus: 0.20, duration: 1.0 }, // x1.20 power for 1.0 s; a new counter restarts the timer, never stacks
-    anim: { jab: 0.18, heavy: 0.34, counterHitstop: 0.06 }, // counterHitstop: visual only
+    anim: { jab: 0.18, heavy: 0.34, counterHitstop: 0.06, gap: 210, push: 110 }, // visual only: hit-stop, and the spacing of the two fighters (the 2D fighters are wider than the stickmen)
     // Bots: six levels, evenly spaced, each with a small personality. `beatAt` is the honest number on the
     // card: a player whose measured average (correct keystrokes only, like the result screen) is about this
     // many wpm, at 96% accuracy with the Bo staff, wins about half the time (tests/duel-sim.js calibrates it).
     //   wpm: the bot's raw key rate (it includes its typos)   accuracy: chance each key is right
     //   recovery: [pause, random extra] seconds after a typo, before it fixes it   drift: speed swing (0.15 = +-15%)
-    //   weapon: the bot's weapon (default CONFIG.weapons.botWeapon)
+    //   char: the 2D fighter the bot plays as (a key of Chars.DEFS, cosmetic only; if it is yours, the next one)
     bots: [
-      { name: "ROOKIE",    style: "Careful and slow",       beatAt: 30,  wpm: 34.5,  accuracy: 0.97, recovery: [0.30, 0.25], drift: 0.10, weapon: "light" },
-      { name: "SCRAPPER",  style: "Sloppy brawler",         beatAt: 45,  wpm: 56.5,  accuracy: 0.90, recovery: [0.10, 0.10], drift: 0.25 },
-      { name: "TECHNICIAN",style: "Steady combo builder",   beatAt: 60,  wpm: 52,  accuracy: 0.99, recovery: [0.25, 0.15], drift: 0.05 },
-      { name: "DUELIST",   style: "Balanced all-rounder",   beatAt: 75,  wpm: 82,  accuracy: 0.96, recovery: [0.18, 0.15], drift: 0.15 },
-      { name: "BERSERKER", style: "Fast, wild bursts",      beatAt: 90,  wpm: 138, accuracy: 0.92, recovery: [0.08, 0.08], drift: 0.30, weapon: "light" },
-      { name: "WARLORD",   style: "Heavy-hitting boss", beatAt: 110, wpm: 92, accuracy: 0.97, recovery: [0.18, 0.12], drift: 0.12, weapon: "heavy" },
+      { name: "ROOKIE",    style: "Careful and slow",       beatAt: 30,  wpm: 31,   accuracy: 0.97, recovery: [0.30, 0.25], drift: 0.10, char: "bluex" },
+      { name: "SCRAPPER",  style: "Sloppy brawler",         beatAt: 45,  wpm: 56.5, accuracy: 0.90, recovery: [0.10, 0.10], drift: 0.25, char: "grin" },
+      { name: "TECHNICIAN",style: "Steady combo builder",   beatAt: 60,  wpm: 52,   accuracy: 0.99, recovery: [0.25, 0.15], drift: 0.05, char: "voss" },
+      { name: "DUELIST",   style: "Balanced all-rounder",   beatAt: 75,  wpm: 82,   accuracy: 0.96, recovery: [0.18, 0.15], drift: 0.15, char: "ronin" },
+      { name: "BERSERKER", style: "Fast, wild bursts",      beatAt: 90,  wpm: 117,  accuracy: 0.92, recovery: [0.08, 0.08], drift: 0.30, char: "reaver" },
+      { name: "WARLORD",   style: "Heavy-hitting boss",     beatAt: 110, wpm: 112,  accuracy: 0.97, recovery: [0.18, 0.12], drift: 0.12, char: "varun" },
     ],
     // MATCH ME: aims at your average wpm over your last `history` matches (stored in localStorage), `start`
     // before you have any. It types like the calibration player (96%, Bo staff, the default recovery), with
     // its key rate set by Bot.rawWpmFor so its measured average lands on the target: an even fight.
     matchMe: { name: "MATCH ME", style: "Your last 3 matches", storageKey: "typeboxing.history", history: 3, start: 50,
-      accuracy: 0.96, recovery: [0.18, 0.15], drift: 0.15 },
+      accuracy: 0.96, recovery: [0.18, 0.15], drift: 0.15, char: "veil" },
   },
 
-  // Weapons: trade typing difficulty for power. A rule input: each typist's weapon changes their
-  // words, power, combo pace, ultimate requirement, mistake charge cost and ultimate word.
-  //   power = wpm * weapon.power * (1 + weapon.comboBonus * comboLevel), then x1.20 during a counter
-  // A field a weapon leaves out falls back to the global value in CONFIG.duel, so Medium (no
-  // overrides) plays exactly like the original game. Pools are named here and live in words.js.
-  // Online, both weapon ids will travel with the match seed.
+  // One rule set for every typist. The weapon tiers (Light and Heavy) were removed: the only difficulty
+  // choice is the bot's speed. The "medium" entry stays as the rule set every typist uses (common words,
+  // hard ultimate words, the globals in CONFIG.duel), so duel-typing.js keeps one code path. Fighters are
+  // cosmetic (CONFIG.chars) and never change a number.
   weapons: {
-    storageKey: "typeboxing.weapon",
     defaultWeapon: "medium",
-    botWeapon: "medium",      // the bots use this weapon
+    botWeapon: "medium",
     list: [
-      // Light: truly easy words, less damage, the longest road to the ultimate (15 clean words in a row).
-      { id: "light", tier: "LIGHT", name: "Hand wraps", words: "easy short words", pool: "light", ultPool: "light",
-        power: 0.845, wordsPerCombo: 5, comboRequired: 3, mistakeCharge: 6 },
-      { id: "medium", tier: "MEDIUM", name: "Bo staff", words: "common words", pool: "common", ultPool: "hard",
-        power: 1.0 },         // wordsPerCombo, comboRequired and mistakeCharge: the globals in CONFIG.duel
-      // Heavy: long, hard words, more damage, short combos: the ultimate at combo x1 (3 clean words) and a full bar.
-      { id: "heavy", tier: "HEAVY", name: "Greatsword", words: "long hard words", pool: "heavy", ultPool: "hardest",
-        power: 1.185, comboBonus: 0.15, wordsPerCombo: 3, comboRequired: 1, mistakeCharge: 10 },
+      { id: "medium", tier: "STANDARD", name: "Standard", words: "common words", pool: "common", ultPool: "hard", power: 1.0 },
     ],
+  },
+
+  // The 2D fighters (js/anim-chars.js draws them, js/duel-chars.js animates them in the duel). Cosmetic only:
+  // no rule reads them. Each typist keeps one identity color for the HUD, plate letters and sparks.
+  chars: {
+    storageKey: "typeboxing.char",
+    defaultChar: "cyborg",
+    you: { body: "#4ade80", letters: "#4ade80" },
+    foe: { body: "#fb923c", letters: "#fdba74" },
   },
 
   // Full screen framing (visual only). The arena canvas fills the window; these are drawing units.
@@ -206,7 +205,7 @@ const CONFIG = {
     classicHeight: 520,       // Classic view: a wider shot, with room for the typing box under the floor
     classicFloorFromBottom: 200,
     cameraSpeed: 4,           // how fast the camera follows the fighters and zooms
-    bodyReach: 56,            // half a fighter's width plus a margin, for the zoom
+    bodyReach: 96,            // half a fighter's width (with its weapon) plus a margin, for the zoom
     maxZoom: 1.6,             // when the fighters fly apart the camera zooms out, at most this much
     uiSize: [1366, 768],      // the DOM UI is designed at this size and scaled to the window
     uiMinScale: 0.7, uiMaxScale: 2.5,
@@ -215,8 +214,9 @@ const CONFIG = {
   // Player settings (visual only), saved in localStorage. The view keeps its own key (wordPlate.storageKey).
   settings: {
     storageKey: "typeboxing.settings",
-    defaults: { reduceMotion: false, shake: 1, damageNumbers: true },
+    defaults: { reduceMotion: false, shake: 1, damageNumbers: true, sound: true, volume: 0.7 },
     shakeSteps: [[0, "Off"], [0.5, "Low"], [1, "Normal"], [1.5, "Strong"]],
+    volumeSteps: [[0.3, "Low"], [0.5, "Medium"], [0.7, "High"], [1, "Max"]],
   },
 
   // Word plates: each typist's current word floats over their own fighter.
@@ -270,34 +270,5 @@ const CONFIG = {
     outline: "rgba(2, 4, 12, 0.92)", // dark outline under every floating text, so it reads over the scenery
     lose: THEME.ui.warn, gain: THEME.ui.phosphor,
     margin: 12,             // texts are nudged to stay this far inside the arena
-  },
-
-  // Stickman colors. Cosmetic only: no rule reads them. main.js puts the choice on each Fighter
-  // (fighter.color, fighter.letterColor, fighter.sparkColor) at match start; render.js falls back to its
-  // old defaults when they are not set (the sandbox never sets them). Online, the choice will be sent
-  // with the match seed. No red family: red means typos and the bot.
-  cosmetics: {
-    storageKey: "typeboxing.color",
-    defaultColor: "white",
-    colors: [ // body: stickman, sparks and the YOU name; letters: correct letters in your word plate
-      { id: "white",  name: "WHITE",  body: "#f1f3f8", letters: "#4ade80" }, // the original look
-      { id: "mint",   name: "MINT",   body: "#6ee7b7", letters: "#6ee7b7" },
-      { id: "green",  name: "GREEN",  body: "#4ade80", letters: "#4ade80" },
-      { id: "cyan",   name: "CYAN",   body: "#22d3ee", letters: "#22d3ee" },
-      { id: "sky",    name: "SKY",    body: "#7dd3fc", letters: "#7dd3fc" },
-      { id: "indigo", name: "INDIGO", body: "#818cf8", letters: "#818cf8" },
-      { id: "violet", name: "VIOLET", body: "#a78bfa", letters: "#a78bfa" },
-      { id: "pink",   name: "PINK",   body: "#f472b6", letters: "#f472b6" },
-      { id: "amber",  name: "AMBER",  body: "#f59e0b", letters: "#f59e0b" },
-      { id: "yellow", name: "YELLOW", body: "#fde047", letters: "#fde047" },
-    ],
-    bot: { name: "RED", body: "#e8737d", letters: "#fdba74" }, // the bot's usual look (letters orange, never red)
-    // If your color is too close to the bot's, the bot uses the first backup that is far enough from yours.
-    botBackups: [
-      { name: "ORANGE", body: "#fb923c", letters: "#fdba74" },
-      { name: "BLUE",   body: "#60a5fa", letters: "#93c5fd" },
-    ],
-    minHueGap: 35,          // degrees of hue; closer than this counts as "too close"
-    minSaturation: 0.25,    // greyish colors (like white) have no real hue and never clash
   },
 };

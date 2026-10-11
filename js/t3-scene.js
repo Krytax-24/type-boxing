@@ -4,11 +4,16 @@ const T3S = (() => {
   const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const rng = (seed) => { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); };
 
-  function create(canvas) {
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true });
-    renderer.setPixelRatio(1);
+  // opts.smooth (roster3d.html): antialiased, full resolution (up to 2x on high density screens), soft shadows
+  // and smooth texture filtering on the stage, for the smooth character models. Without it: the PS1 look.
+  function create(canvas, opts) {
+    opts = opts || {};
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !!opts.smooth, powerPreference: "high-performance", preserveDrawingBuffer: true });
+    renderer.setPixelRatio(opts.smooth ? Math.min(2, window.devicePixelRatio || 1) : 1);
     renderer.outputEncoding = THREE.LinearEncoding;
-    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = opts.smooth ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    // Smooth mode renders in sRGB with filmic tone mapping (the physically based characters need both).
+    if (opts.smooth) { renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = opts.exposure || 1.2; }
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x141022);
     scene.fog = new THREE.Fog(0x1a1428, 12, 38);
@@ -22,12 +27,15 @@ const T3S = (() => {
     scene.add(key); scene.add(key.target);
     const rim = new THREE.DirectionalLight(0x7a9cff, 0.6); rim.position.set(2, 3, -6); scene.add(rim);
     const hemi = new THREE.HemisphereLight(0x6a72a0, 0x3a2418, 0.62); scene.add(hemi);
-    const S = { renderer, scene, camera, canvas, key, rim, hemi, pixel: 2, high: true, shake: 0, shakeT: 0, zoomK: 0, sparks: [], lookAt: V3(0, 1, 0), t: 0, mood: 0, cine: null };
+    const S = { renderer, scene, camera, canvas, key, rim, hemi, pixel: opts.smooth ? 1 : 2, smooth: !!opts.smooth, high: true, shake: 0, shakeT: 0, zoomK: 0, sparks: [], lookAt: V3(0, 1, 0), t: 0, mood: 0, cine: null };
+    if (opts.smooth) { key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 3; }
     // A pool of point lights for effects (hit flashes, fireballs). The count never changes, so materials never
     // recompile in the middle of a fight.
     S.fxLights = [];
     for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xffffff, 0, 4.5, 2); scene.add(l); S.fxLights.push({ l, life: 0, max: 1, owner: null }); }
     buildArena(S);
+    // Smooth mode: the stage textures are filtered (no hard pixels).
+    if (opts.smooth) scene.traverse((m) => { if (m.material && m.material.map) { const t = m.material.map; t.encoding = THREE.sRGBEncoding; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true; } });
     S.resize = () => resize(S);
     resize(S);
     return S;
@@ -341,6 +349,13 @@ const T3S = (() => {
     if (kind === "gold") for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.04), T3M.mat(i % 2 ? 0xffd25a : 0xffa53a, { glow: true, double: true })); m.position.copy(p); add(m, V3(r() * 2.5, 0.6 + Math.random() * 1.5, r() * 2.5), 0.7 + Math.random() * 0.3, { spin: true, light: true }); }
     if (kind === "impact") for (let i = 0; i < 4; i++) { const s = sprite("puff", 0xd8d0c0, false, 0.55); s.position.copy(p); s.scale.setScalar(0.25); add(s, V3(r() * 1.2, r() * 0.8, r() * 1.2), 0.35, { grow: 2, fade: true, float: true }); }
     if (kind === "wind") for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.4), T3M.mat(0xdfe8ff, { glow: true, add: true, opacity: 0.8 })); m.position.copy(p); const v = V3(r() * 5, r() * 2, r() * 5); m.lookAt(p.clone().add(v)); add(m, v, 0.18); }
+    // Kinds added for the roster (roster3d.html): blood (crimson slashes), hellfire (red fire), muzzle (gun smoke
+    // and a flash), rock (stone chips and dust), steam (the cyborg's vents).
+    if (kind === "blood") for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.26), T3M.mat(i % 2 ? 0xff2a3a : 0xff8a8a, { glow: true, add: true })); m.position.copy(p); const v = V3(r() * 6, Math.random() * 3, r() * 6); m.lookAt(p.clone().add(v)); add(m, v, 0.32); }
+    if (kind === "hellfire") for (let i = 0; i < 8; i++) { const s = sprite("glow", i % 2 ? 0xff3a1a : 0xffa040, true, 0.9); s.position.copy(p).add(V3(r() * 0.2, r() * 0.2, r() * 0.2)); s.scale.setScalar(0.2); add(s, V3(r() * 1.5, 1 + Math.random() * 1.5, r() * 1.5), 0.35 + Math.random() * 0.2, { grow: 1.2, fade: true, float: true }); }
+    if (kind === "muzzle") { for (let i = 0; i < 3; i++) { const s = sprite("puff", 0xb8b0a0, false, 0.5); s.position.copy(p); s.scale.setScalar(0.18); add(s, V3(r() * 0.8, 0.3 + Math.random() * 0.4, r() * 0.8), 0.45, { grow: 2.4, fade: true, float: true }); } }
+    if (kind === "rock") { for (let i = 0; i < 9; i++) { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.03 + Math.random() * 0.03, 0), T3M.mat(i % 2 ? 0x6a625a : 0x8c8378, { tex: false })); m.position.copy(p); add(m, V3(r() * 4, 1 + Math.random() * 3, r() * 4), 0.6 + Math.random() * 0.3, { spin: true }); } const d = sprite("puff", 0xa89c88, false, 0.6); d.position.copy(p); d.scale.setScalar(0.4); add(d, V3(0, 0.3, 0), 0.6, { grow: 2.2, fade: true, float: true }); }
+    if (kind === "steam") for (let i = 0; i < 5; i++) { const s = sprite("puff", 0xe8e8f0, false, 0.45); s.position.copy(p); s.scale.setScalar(0.16); add(s, V3(r() * 1.2, 0.5 + Math.random() * 0.8, r() * 1.2), 0.5, { grow: 2.4, fade: true, float: true }); }
     if (kind === "spark") for (let i = 0; i < 6; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.012, 0.22), T3M.mat(0xffe0a0, { glow: true, add: true })); m.position.copy(p); const v = V3(r() * 7, Math.random() * 4, r() * 7); m.lookAt(p.clone().add(v)); add(m, v, 0.3); }
   }
   // A burst of effect without a hit (casting, auras, supers): glow, ring and kind particles.
@@ -478,8 +493,47 @@ const T3S = (() => {
     } else if (kind === "axe" && o.weapon) {
       const c = o.weapon.clone(true); c.position.set(0, 0, 0); c.rotation.set(0, 0, 0); c.scale.setScalar(1);
       const spinner = new THREE.Group(); c.position.x = -0.5; spinner.add(c); g.add(spinner);
-      const glow = sprite("glow", 0x8fdcff, true, 0.6); glow.scale.setScalar(1.2); g.add(glow);
+      const glow = sprite("glow", o.color || 0x8fdcff, true, 0.6); glow.scale.setScalar(1.2); g.add(glow);
       step = (dt) => { spinner.rotation.y -= dt * 22; };
+    } else if (kind === "bullet") {
+      // A pistol round: a bright tracer streak with a small glow (roster3d.html).
+      const streak = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.004, 0.5, 5), M(0xffe6a0)); streak.rotation.z = Math.PI / 2; streak.position.x = -0.2; g.add(streak);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 4), M(0xffffff)); g.add(head);
+      const glow = sprite("glow", 0xffb040, true, 0.8); glow.scale.setScalar(0.3); g.add(glow);
+      step = (dt, t) => { glow.scale.setScalar(0.26 + 0.06 * Math.sin(t * 80)); };
+    } else if (kind === "quake") {
+      // Broken stone rising along the floor in a line (a hammer quake, roster3d.html).
+      const parts = [];
+      for (let i = 0; i < 7; i++) {
+        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.1 + (i % 3) * 0.04, 0), T3M.mat(i % 2 ? 0x6a625a : 0x857b70, { tex: false }));
+        const a = i * 2.2; m.position.set(Math.cos(a) * 0.16, 0, Math.sin(a) * 0.16); m.rotation.set(a, a * 1.3, 0); m.userData.h = 0.1 + (i % 3) * 0.08; g.add(m); parts.push(m);
+      }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.42, 16), M(o.color || 0xffb060, { opacity: 0.55, double: true })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; g.add(ring);
+      step = (dt, t, age) => {
+        const grow = Math.min(1, age / 0.06), fade = o.life ? Math.max(0, Math.min(1, (o.life - age) / 0.2)) : 1;
+        for (const m of parts) { m.scale.setScalar(grow * fade); m.position.y = m.userData.h * grow * fade; }
+        ring.scale.setScalar(1 + age * 2); ring.material.opacity = 0.55 * fade;
+      };
+    } else if (kind === "hellpillar") {
+      // A column of red fire under the opponent (Scarlet Reaver's eruption, roster3d.html).
+      const parts = [];
+      for (let i = 0; i < 10; i++) {
+        const m = new THREE.Mesh(new THREE.ConeGeometry(0.16 + (i % 3) * 0.05, 1.3 + (i % 4) * 0.4, 6), M([0xff2a10, 0xff7a20, 0xffd070, 0xc81020][i % 4], { opacity: 0.75 }));
+        m.position.set(Math.cos(i * 2.4) * 0.12, 0.65, Math.sin(i * 2.4) * 0.12); m.userData.ph = i * 1.3; g.add(m); parts.push(m);
+      }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.6, 20), M(0xff4a20, { opacity: 0.8, double: true })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; g.add(ring);
+      step = (dt, t, age) => {
+        const grow = Math.min(1, age / 0.1), fade = o.life ? Math.max(0, Math.min(1, (o.life - age) / 0.15)) : 1;
+        for (const m of parts) { const ph = t * 14 + m.userData.ph; m.scale.set(0.8 + 0.3 * Math.sin(ph), grow * fade * (0.8 + 0.3 * Math.sin(ph * 1.3)), 0.8 + 0.3 * Math.cos(ph)); }
+        ring.scale.setScalar(1 + age * 3);
+      };
+    } else if (kind === "lash") {
+      // A crimson crescent of air cracked off a whip (Crimson Veil, roster3d.html).
+      const arc = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.03, 4, 16, Math.PI), M(0xff2a4a, { opacity: 0.9, double: true }));
+      arc.rotation.set(Math.PI / 2, 0, -Math.PI / 2); g.add(arc);
+      const core = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.012, 3, 16, Math.PI), M(0xffd0d8, { double: true })); core.rotation.copy(arc.rotation); g.add(core);
+      const glow = sprite("glow", 0xff2a4a, true, 0.6); glow.scale.setScalar(0.7); g.add(glow);
+      step = (dt, t) => { arc.scale.set(1, 1 + 0.2 * Math.sin(t * 50), 1); };
     } else if (kind === "shell") {
       for (let i = 0; i < 9; i++) {
         const h = 0.5 + (i % 3) * 0.35, m = new THREE.Mesh(new THREE.ConeGeometry(0.16, h, 4), T3M.mat(i % 2 ? 0xcff4ff : 0x8fdcff, { glow: true, opacity: 0.55 }));

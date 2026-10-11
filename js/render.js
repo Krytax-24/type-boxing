@@ -108,6 +108,10 @@ class Renderer {
     this.layers = null;      // pre-rendered scenery layers, rebuilt on resize (see buildLayers)
     this.par = 0;            // eased parallax offset (follows the fighters' midpoint)
     this.menuSpar = null;    // [your color, bot color, your weapon, bot weapon]: on the title screen, draw a sparring loop
+    // The 2D fighters (js/duel-chars.js), set by main.js: { keys: [yours, the bot's], glows: [#rrggbb, #rrggbb] }.
+    // When set, the duel and the title sparring draw the designed fighters instead of the stickmen, and the
+    // duel's own sparks are left to the fighters' effects. The sandbox leaves it null.
+    this.chars = null;
     // Full screen duel camera (set by main.js; the sandbox leaves them off, so it looks the same):
     this.follow = false;     // follow the fighters' midpoint and zoom out when they fly apart
     this.zoom = 1;           // eased; 1 = the normal framing
@@ -202,7 +206,13 @@ class Renderer {
     }
 
     // Fighters, farther ones first. On the title screen: a slow sparring loop instead.
-    if (this.menuSpar && sim.phase === "menu") this.drawSpar(ctx, sx(sim.cameraX !== undefined ? sim.cameraX : W / 2), floorY);
+    const C = this.chars && typeof DuelChars !== "undefined" ? this.chars : null;
+    const copt = { res: k, noShake: this.shakeScale === 0 || this.reduceMotion, shadow: CONFIG.theme.arena.shadow };
+    if (this.menuSpar && sim.phase === "menu") {
+      const cx = sx(sim.cameraX !== undefined ? sim.cameraX : W / 2);
+      if (C) DuelChars.drawSpar(ctx, C.keys, cx, floorY, this.reduceMotion ? 0 : dt, C.glows, copt);
+      else this.drawSpar(ctx, cx, floorY);
+    } else if (C && sim.streams) DuelChars.drawDuel(ctx, sim, sx(0), floorY, dt, C.keys, C.glows, copt);
     else for (const f of sim.fighters.slice().sort((a, b) => a.z - b.z)) this.drawFighter(ctx, f, sx(f.x), floorY);
     this.drawFx(ctx, sim, sx, floorY, W);
     for (const e of sim.enemies) if (!e.dead) this.drawEnemyBar(ctx, e, sx(e.x), floorY);
@@ -698,6 +708,7 @@ class Renderer {
     const boxes = [];
     for (const fx of sim.fx) {
       if (fx.lane === "number" && !this.damageNumbers) continue; // player setting
+      if (fx.type === "spark" && this.chars && sim.streams) continue; // the 2D fighters draw their own hit effects
       const t = fx.age / fx.life;
       const x = sx(fx.x), y = floorY - fx.z;
       ctx.save();

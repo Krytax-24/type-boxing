@@ -419,6 +419,81 @@ const Rig = (() => {
     poly(ctx, S, h, deg, [[100, -3], [118, 0], [100, 3]], "#2f3640", "#0f1216", 1.4);
   };
 
+  // Ronin Unit's katana: a long, slim, slightly curved blade, a round guard and a wrapped black grip.
+  WEAPON_DRAW.katana = (ctx, S, h, deg, acc, pal) => {
+    seg(ctx, S, h, deg, -26, 2, 6, "#121216");
+    for (let u = -24; u < 0; u += 5) { const a = S.wpt(h, deg, u, -3), b = S.wpt(h, deg, u + 4, 3);
+      ctx.strokeStyle = "#3a3f48"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    dot(ctx, S.wpt(h, deg, -28, 0), 3.2, "#3a3f48");
+    dot(ctx, S.wpt(h, deg, 4, 0), 6.4, "#2a2d33", "#0d0e10", 1.2);
+    poly(ctx, S, h, deg, [[7, -3], [60, -3.4], [104, -6], [122, -9.5], [112, -2.6], [60, 2.6], [7, 3]], "#d9dee6", "#3c4048", 1.4);
+    poly(ctx, S, h, deg, [[9, 0.6], [60, 0.8], [106, -2.4], [112, -3.4], [60, 2.6], [9, 3]], "#a7aeb9");
+    seg(ctx, S, h, deg, 8, 14, 2.4, pal.glow || acc);
+  };
+  // Crimson Veil's whip: a short gold-capped grip, a braided black lash that sags under its own weight, and
+  // an ornate gold leaf with a teal gem at the tip.
+  WEAPON_DRAW.whip = (ctx, S, h, deg, acc, pal) => {
+    seg(ctx, S, h, deg, -12, 12, 6.4, "#120d10");
+    bands(ctx, S, h, deg, -10, 10, 5, pal.gold, 6.8);
+    dot(ctx, S.wpt(h, deg, -14, 0), 4, pal.gold, "#5a4318", 1.2);
+    const a = S.wpt(h, deg, 12, 0), tip = S.wpt(h, deg, 138, 0), mid = S.wpt(h, deg, 78, 0);
+    const sag = 26 * Math.abs(Math.cos(deg * Math.PI / 180)) + 8;
+    const c = [mid[0], mid[1] + sag];
+    const at = (t) => [(1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * c[0] + t * t * tip[0], (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * c[1] + t * t * tip[1]];
+    for (const [w, col] of [[4.6, "#0a0709"], [2.8, "#3a2a2e"]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(c[0], c[1], tip[0], tip[1]); ctx.stroke();
+    }
+    ctx.strokeStyle = "#5a4a4e"; ctx.lineWidth = 1;
+    for (let t = 0.06; t < 0.96; t += 0.06) { const p = at(t), q = at(t + 0.02); ctx.beginPath(); ctx.moveTo(p[0] - 1.6, p[1] - 1.6); ctx.lineTo(q[0] + 1.6, q[1] + 1.6); ctx.stroke(); }
+    const pre = at(0.92), ang = Math.atan2(tip[1] - pre[1], tip[0] - pre[0]);
+    ctx.save(); ctx.translate(tip[0], tip[1]); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(-2, 0); ctx.lineTo(6, -6); ctx.lineTo(20, 0); ctx.lineTo(6, 6); ctx.closePath();
+    ctx.fillStyle = pal.gold; ctx.fill(); ctx.strokeStyle = "#5a4318"; ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.beginPath(); ctx.arc(7, 0, 2.4, 0, Math.PI * 2); ctx.fillStyle = pal.teal; ctx.fill();
+    ctx.restore();
+  };
+  // Scarlet Reaver's axe: one huge grey crescent with blood streaks and a pale edge, a demon skull crowning
+  // the head, red wraps on the shaft.
+  WEAPON_DRAW.reaverAxe = (ctx, S, h, deg, acc, pal) => {
+    seg(ctx, S, h, deg, -40, 110, 7.6, "#120d0d");
+    seg(ctx, S, h, deg, -39, 109, 5.4, "#3a2620");
+    for (const u of [-30, -6, 60, 72]) seg(ctx, S, h, deg, u, u + 5, 8.6, pal.redD);
+    dot(ctx, S.wpt(h, deg, -44, 0), 5, "#2a2224");
+    poly(ctx, S, h, deg, [[74, -4], [62, -22], [52, -52], [68, -50], [92, -48], [118, -56], [130, -40], [116, -20], [106, -4]], "#6f747c", "#1c1e22", 2);
+    poly(ctx, S, h, deg, [[56, -48], [52, -52], [68, -52], [92, -50], [118, -58], [128, -44], [112, -46], [92, -44], [68, -46]], "#e9e6df");
+    for (const [u, v] of [[84, -30], [96, -24], [74, -38]]) poly(ctx, S, h, deg, [[u, v], [u + 4, v - 10], [u + 2, v + 2]], "rgba(140, 10, 20, 0.85)");
+    poly(ctx, S, h, deg, [[100, -6], [116, -6], [124, 0], [116, 8], [102, 8]], pal.red, "#2a0a0e", 1.4);
+    dot(ctx, S.wpt(h, deg, 112, -1), 1.8, "#ffcc33"); dot(ctx, S.wpt(h, deg, 112, 4), 1.8, "#ffcc33");
+    poly(ctx, S, h, deg, [[118, -6], [128, -12], [122, -2]], "#e9e6df"); poly(ctx, S, h, deg, [[118, 8], [128, 14], [122, 4]], "#e9e6df");
+  };
+  // Varun's war hammer: a long dark shaft, a heavy block head with gold-bordered faces, a spear spike at the butt.
+  WEAPON_DRAW.warHammer = (ctx, S, h, deg, acc, pal) => {
+    seg(ctx, S, h, deg, -60, 92, 7, "#141114");
+    seg(ctx, S, h, deg, -59, 91, 4.8, "#4a3a2c");
+    for (const u of [-10, 6, 70]) seg(ctx, S, h, deg, u, u + 5, 8, pal.gold);
+    poly(ctx, S, h, deg, [[-58, -3.4], [-64, -6], [-90, 0], [-64, 6], [-58, 3.4]], "#c9ccd3", "#2a2c31", 1.4);
+    poly(ctx, S, h, deg, [[80, -24], [114, -24], [114, 24], [80, 24]], "#5b5f66", "#1c1e22", 2);
+    poly(ctx, S, h, deg, [[83, -21], [111, -21], [111, 21], [83, 21]], null, pal.gold, 2.2);
+    poly(ctx, S, h, deg, [[90, -10], [104, -10], [104, 10], [90, 10]], "#3e4248", pal.goldD, 1.2);
+    poly(ctx, S, h, deg, [[114, -6], [124, 0], [114, 6]], "#5b5f66", "#1c1e22", 1.4);
+  };
+  // Grin's pistols: one in each hand, along the forearm (a fist weapon, so the barrel follows elbow to hand).
+  function pistolAt(ctx, S, elbow, hand, pal) {
+    const dx = hand[0] - elbow[0], dy = hand[1] - elbow[1], d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, nx = -uy, ny = ux;
+    const P = (u, v) => [hand[0] + ux * u + nx * v, hand[1] + uy * u + ny * v];
+    const pl = (pts, fill, stroke) => { ctx.beginPath(); pts.forEach((p, i) => { const q = P(p[0], p[1]); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.2; ctx.stroke(); } };
+    const side = S.facing;
+    pl([[-2, 2 * side], [5, 2 * side], [5, 9 * side], [-2, 9 * side]], "#1c1c20", "#060608");
+    pl([[-4, -3 * side], [24, -3 * side], [24, 3 * side], [-4, 3 * side]], "#2a2a30", "#060608");
+    pl([[16, -3 * side], [24, -3 * side], [24, 0], [16, 0]], pal.yellow);
+  }
+  WEAPON_DRAW.pistols = (ctx, S, h, deg, acc, pal, which) => {
+    const J = S.J;
+    if (which !== "front") pistolAt(ctx, S, J.be, J.bh, pal);
+    if (which !== "back") pistolAt(ctx, S, J.fe, J.fh, pal);
+  };
+
   // Weapon models: how each one is held, drawn and where its trail runs (u, v points along the weapon).
   const WEAPONS = {
     sword:  { draw: "sword",  hands: 1, trail: [[106, 0], [36, 0]] },

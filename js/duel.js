@@ -302,7 +302,7 @@ class Duel {
   placeFighters(dt) {
     const target = Math.max(-1, Math.min(1, (this.power[0] - this.power[1]) / DU.tugRange));
     this.tug += (target - this.tug) * Math.min(1, dt * 3);
-    const cx = 480, gap = 130, push = 95;
+    const cx = 480, gap = DU.anim.gap, push = DU.anim.push; // visual spacing only
     this.fighters.forEach((f, i) => {
       let x = cx + (i === 0 ? -gap / 2 : gap / 2) + push * this.tug + f.kx;
       if (f.state === "attack" && f.move) {

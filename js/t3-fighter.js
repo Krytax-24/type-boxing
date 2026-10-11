@@ -28,7 +28,7 @@ const T3F = (() => {
       this.hit = e.hit ? Object.assign({ dmg: 10, level: "M", react: "light", push: 0.8 }, e.hit) : null;
       this.act = owner.action; // spells with the same `once` key from one action hit only once between them
       if (owner.S) {
-        this.mesh = T3S.projMesh(owner.S, e.kind, { life: e.life, weapon: e.kind === "axe" ? owner.rig.weaponGroup : null });
+        this.mesh = T3S.projMesh(owner.S, e.kind, { life: e.life, color: e.color, weapon: e.kind === "axe" ? owner.rig.weaponGroup : null });
         this.mesh.group.visible = !(e.delay > 0);
         if (e.trail) this.trail = new T3S.Trail(owner.S, e.trail, 10);
         if (e.light) this.light = T3S.holdLight(owner.S, this, e.light, e.lightK || 1.6);
@@ -99,7 +99,7 @@ const T3F = (() => {
     setChar(id) {
       if (this.rig) { this.clearProjectiles(); this.clearTrails(true); }
       if (this.rig && this.rig.bones.root.parent) { this.rig.bones.root.parent.remove(this.rig.bones.root); this.rig.strandGroup.parent.remove(this.rig.strandGroup); this.rig.shadow.parent.remove(this.rig.shadow); }
-      this.id = id; this.rig = T3M.build(id); this.def = this.rig.def; this.B = this.rig.B;
+      this.id = id; this.rig = (Fighter.models || T3M).build(id); this.def = this.rig.def; this.B = this.rig.B;
       this.list = T3Moves.get(id);
       this.st = this.list.stance;
       this.loco = Object.assign({}, LOCO, this.list.loco);
@@ -124,7 +124,7 @@ const T3F = (() => {
       this.clearProjectiles();
       this.rig.weaponGroup.visible = true;
       this.solve(0);
-      T3M.resetStrands(this.rig);
+      (Fighter.models || T3M).resetStrands(this.rig);
       this.clearTrails();
     }
     // ---------- Helpers ----------
@@ -757,7 +757,7 @@ const T3F = (() => {
       this.rig.shadow.scale.setScalar(clamp(1 - root.position.y * 0.3, 0.5, 1));
     }
     visuals(dt, t) {
-      T3M.update(this.rig, this.pose, dt, t, V3(-this.fwd.x * 2, 0, -this.fwd.z * 2));
+      (Fighter.models || T3M).update(this.rig, this.pose, dt, t, V3(-this.fwd.x * 2, 0, -this.fwd.z * 2));
       if (!this.S) return;
       // Trails: the striking part of a move draws a ribbon from a little before its hit until just after.
       if (dt > 0) {
@@ -788,5 +788,7 @@ const T3F = (() => {
       if (this.shell) { if (!this.frozen) { T3S.removeMesh(this.S, this.shell); this.shell = null; } else { this.shell.group.position.set(this.pos.x, this.y, this.pos.z); this.shell.group.rotation.y = this.yaw; } }
     }
   }
+  // The model set the fighters are built from: T3M (the 3D Lab) unless a page sets another (roster3d.html sets R3M).
+  Fighter.models = null;
   return { Fighter, Projectile, LOCO, dirOf };
 })();

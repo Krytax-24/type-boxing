@@ -15,7 +15,7 @@
     char: "cyborg", speeds: [1, 0.5, 0.25, 0.1], speedIdx: 0, paused: false, stepOnce: false,
     onion: false, dummyOn: true, bg: "studio", panel: true, repeat: false, sheet: 0, compare: false, mode: "lock",
     hitstop: 0, shake: 0, camX: 0, time: 0, res: 1, W: 1366, keys: {}, acc: 0, script: null, testInput: null,
-    zoom: 1, zoomV: 0, impact: null, sound: true,
+    zoom: 1, zoomV: 0, impact: null, sound: true, combo: null, comboSeed: 20261011,
   };
 
   // ---------- Sound: synthesized with Web Audio (no files). Starts on the first key press (browsers require it). ----------
@@ -63,6 +63,9 @@
       axe: (t, k) => { tone(t, 0.32, "sine", 95, 38, 0.7); noise(t, 0.18, "lowpass", 1400, 200, 0.7, 0.45 + 0.2 * k); tone(t, 0.4, "triangle", vary(900, 0.05), 860, 0.08); },
       frost: (t) => { noise(t, 0.35, "highpass", 4000, 6000, 0.6, 0.25); tone(t, 0.5, "sine", vary(2600, 0.05), 3100, 0.05); },
       flame: (t) => noise(t, 0.3, "bandpass", 700, 300, 0.8, 0.3),
+      whip: (t, k) => { noise(t, 0.035, "highpass", 4200, 0, 0.8, 0.55 + 0.2 * k); tone(t, 0.06, "square", vary(2400, 0.08), 900, 0.08); noise(t + 0.02, 0.12, "bandpass", 1600, 700, 1.2, 0.2); },
+      gun: (t, k) => { noise(t, 0.05, "highpass", 1500, 0, 0.7, 0.75); tone(t, 0.14, "square", vary(180, 0.08), 50, 0.22 + 0.1 * k); noise(t + 0.03, 0.25, "lowpass", 900, 200, 0.7, 0.2); },
+      hammer: (t, k) => { tone(t, 0.42, "sine", 70, 30, 0.85); noise(t, 0.2, "lowpass", 900, 120, 0.7, 0.5 + 0.2 * k); tone(t, 0.5, "triangle", vary(620, 0.04), 600, 0.1); },
     };
     function play(name, k) {
       if (!lab.sound || !ac || ac.state !== "running") return;
@@ -141,6 +144,11 @@
   }
   function ring(x, y, w, life) { particles.push({ k: "ring", x, y, w, life: life || 0.45, age: 0 }); }
   const HIT_SOUND = { fists: "punch", flame: "punch", dance: "punch", sword: "slash", bat: "bat", staff: "staff", axe: "axe" };
+  // The drawn weapon picks the sound when it differs from the move set (a whip on sword moves, pistols on fists).
+  const DRAW_SOUND = { whip: "whip", katana: "slash", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
+  const hitSound = (a) => (a.def && DRAW_SOUND[a.def.weaponDraw]) || HIT_SOUND[a.weapon] || "punch";
+  const drawOf = (a) => (a.def ? a.def.weaponDraw : null);
+  function muzzle(a, S) { const h = S.J.fh; particles.push({ k: "flash", x: h[0] + a.facing * 26, y: h[1] - 4, r: 18, life: 0.07, age: 0, color: "255, 214, 90" }); sparks(h[0] + a.facing * 26, h[1] - 4, 5, "255, 214, 90", 0.6); }
   // Blue fire burst (flame brawler): rising, fading flame puffs, pushed forward by dir.
   function flameBurst(x, y, n, dir, size) {
     for (let i = 0; i < n; i++) particles.push({ k: "fire", x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: dir * rnd(80, 260) + rnd(-40, 40), vy: -rnd(30, 140), r: rnd(5, 11) * (size || 1), life: rnd(0.25, 0.5), age: 0 });
@@ -198,11 +206,13 @@
           lab.impact = { t: 0.05 + 0.02 * big, life: 0.05 + 0.02 * big, x: hx, y: hy, color: a.look.trail };
           lab.zoomV += 0.9 + 0.6 * big;
           lab.shake = Math.max(lab.shake, 3 + 3 * big);
-          Sfx.play(HIT_SOUND[a.weapon] || "punch", big / 2);
+          Sfx.play(hitSound(a), big / 2);
           if (a.weapon === "flame") { flameBurst(hx, hy, 14 + 6 * big, a.facing); a.heat = 1; }
-          if (a.weapon === "axe") frost(hx, hy, 10 + 6 * big);
+          if (drawOf(a) === "axe") frost(hx, hy, 10 + 6 * big);
+          if (drawOf(a) === "warHammer") { ring(hx, FLOOR, 70 + 30 * big, 0.45); dust(hx, FLOOR, 6 + 4 * big, 60, 0); }
+          if (drawOf(a) === "pistols") muzzle(a, S);
           Sfx.play("hurt");
-        } else sparks(p[0], p[1], 4, a.look.trail, 0.6);
+        } else { sparks(p[0], p[1], 4, a.look.trail, 0.6); if (drawOf(a) === "pistols") { muzzle(a, S); Sfx.play("gun", 0); } }
         break;
       }
       case "parry": { const p = strikePoint(a, S); star(p[0] + a.facing * 6, p[1]); lab.hitstop = 0.05; lab.shake = Math.max(lab.shake, 2); Sfx.play("parry"); break; }
@@ -210,7 +220,12 @@
       case "tap": dust(strikePoint(a, S)[0], FLOOR, 3, 20, 0, null, 0.6); Sfx.play("step"); break;
       case "whirl": Sfx.play("whoosh", 1); break;
       case "roar": lab.shake = Math.max(lab.shake, 4); lab.zoomV += 0.6; Sfx.play("thud"); break;
-      case "frost": { const p = strikePoint(a, S); frost(p[0], Math.min(p[1], FLOOR - 4), 18); ring(p[0], FLOOR, 110, 0.55); Sfx.play("frost"); break; }
+      case "frost": {
+        const p = strikePoint(a, S);
+        if (drawOf(a) === "axe") { frost(p[0], Math.min(p[1], FLOOR - 4), 18); ring(p[0], FLOOR, 110, 0.55); Sfx.play("frost"); }
+        else { dust(p[0], FLOOR, 12, 120, 0); ring(p[0], FLOOR, 110, 0.55); sparks(p[0], FLOOR - 6, 12, a.look.trail, 1.2); lab.shake = Math.max(lab.shake, 5); Sfx.play(drawOf(a) === "warHammer" ? "hammer" : "thud"); }
+        break;
+      }
       case "blast": { const h = S.J.orb; flameBurst(h[0], h[1], 18, a.facing, 1.5); a.heat = 1; Sfx.play("flame"); break; }
       case "pillar": { const p = strikePoint(a, S); for (let i = 0; i < 4; i++) flameBurst(p[0], FLOOR - 10 - i * 26, 6, 0, 0.8); a.heat = 1; Sfx.play("flame"); break; }
       case "flare": { const h = a.weapon === "flame" ? S.J.orb : S.J.fh; flameBurst(h[0], h[1] - 6, 10, 0, 0.7); a.heat = 1; Sfx.play("flame"); break; }
@@ -218,6 +233,7 @@
   }
 
   // ---------- Input (testing only) ----------
+  const CHAR_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
   const ACTIONS = { a: "a1", s: "a2", d: "a3", f: "a4", q: "combo", e: "parry", h: "hit", t: "taunt", k: "death" };
   const tap = { dir: 0, at: -1, released: true };
   let jumpEdge = false, lastAction = null;
@@ -230,7 +246,15 @@
     lab.keys[k] = true;
     Sfx.init();
     if (k === "u") { lab.sound = !lab.sound; return; }
-    if (k >= "1" && k <= "6") { lab.char = ROSTER[+k - 1]; swapCharacter(); return; }
+    const ci = CHAR_KEYS.indexOf(k);
+    if (ci >= 0 && ci < ROSTER.length) { lab.char = ROSTER[ci]; swapCharacter(); return; }
+    if (k === "g") {
+      // G: a new random combo for this fighter; Shift+G replays the last one.
+      if (!e.shiftKey || !lab.combo) { lab.comboSeed = (Math.imul(lab.comboSeed, 1103515245) + 12345) >>> 0; lab.combo = Combo2D.random(DEF(lab.char).weapon, lab.comboSeed); }
+      for (const c of actors()) c.playSeq(lab.combo.slice(), fire);
+      updatePanel();
+      return;
+    }
     if (k === "z") { lab.speedIdx = (lab.speedIdx + 1) % lab.speeds.length; return; }
     if (k === "p") { lab.paused = !lab.paused; return; }
     if (k === ".") { lab.paused = true; lab.stepOnce = true; return; }
@@ -273,6 +297,7 @@
   }
 
   function swapCharacter() {
+    lab.combo = null;
     setCharacter(player, DEF(lab.char));
     setCharacter(twin, DEF(nextChar(lab.char)));
     sheetCache = null;
@@ -361,7 +386,7 @@
       clothStep(a, S, dt / 2, FLOOR, lab.time, vel);
       clothStep(a, S, dt / 2, FLOOR, lab.time, vel);
       a.heat = Math.max(0, (a.heat || 0) - dt * 2.5);
-      if (a.def && a.def.weapon === "axe" && Math.random() < 0.25) { const q = Rig.trailPoints(S, "axe")[0][0]; particles.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.4), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
+      if (a.def && a.def.weaponDraw === "axe" && Math.random() < 0.25) { const q = Rig.trailPoints(S, "axe")[0][0]; particles.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.4), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
       updateTrails(a, dt, prevClip, prevU);
       updateGhosts(a, dt, S);
       if (a === player && a.dashT > 0 && !a.dashBack && Math.random() < 0.6)
@@ -667,8 +692,8 @@
   function updatePanel() {
     const d = DEF(lab.char), w = Anim.W[d.weapon];
     $("char-name").textContent = d.name;
-    $("char-sub").textContent = `${d.title}, ${w.name}` + (lab.compare ? `  |  ${DEF(nextChar(lab.char)).name} copies you behind` : "");
-    $("roster").innerHTML = ROSTER.map((id, i) => `<span class="chip ${id === lab.char ? "on" : ""}"><kbd>${i + 1}</kbd>${DEF(id).name}</span>`).join("");
+    $("char-sub").textContent = `${d.title}, ${w.name}` + (lab.combo ? `  |  combo ${Combo2D.label(lab.combo)}` : "") + (lab.compare ? `  |  ${DEF(nextChar(lab.char)).name} copies you behind` : "");
+    $("roster").innerHTML = ROSTER.map((id, i) => `<span class="chip ${id === lab.char ? "on" : ""}"><kbd>${CHAR_KEYS[i]}</kbd>${DEF(id).name}</span>`).join("");
   }
   const NAMES = { idle: "Idle", walk: "Walk", backwalk: "Walk backward", run: "Run", crouch: "Crouch", crouchwalk: "Crouch walk", jump: "Jump", fall: "Fall",
     turn: "Turn around", dash: "Dash", backdash: "Back dash", skid: "Skid" };
@@ -676,7 +701,7 @@
     const a = player;
     if (a.action) {
       const c = a.action.c, frames = c.frames || 1;
-      $("st-clip").textContent = a.comboName ? `Combo sequence: ${c.label}` : c.label;
+      $("st-clip").textContent = a.comboName === "random" && lab.combo ? `Random combo (${Combo2D.label(lab.combo)}): ${c.label}` : a.comboName ? `Combo sequence: ${c.label}` : c.label;
       $("st-frame").textContent = `frame ${Math.min(frames, Math.floor(a.action.u * frames) + 1)} of ${frames}`;
       $("st-bar").style.width = (a.action.u * 100).toFixed(1) + "%";
       $("st-ticks").innerHTML = c.events.filter((e) => e[1] === "impact").map((e) => `<i style="left:${e[0] * 100}%"></i>`).join("");

@@ -57,7 +57,7 @@ const Chars = (() => {
       { pts: [[0.06, -1], [0.06, 2], [0.13, 2], [0.13, -1]], color: "#9aa0a8" },
     ],
   });
-  DEFS.cyborg.head = (P) => ({ skin: P.skin, hair: { style: "spiky", color: P.hair }, eye: "#1a1418", brow: true, jaw: true });
+  DEFS.cyborg.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "spiky", color: P.hair } });
   DEFS.cyborg.cloth = [];
 
   DEFS.bluex = {
@@ -89,7 +89,7 @@ const Chars = (() => {
       { spots: [[0.3, 1, 2.2], [0.55, -3, 1.6], [0.78, 2, 1.4], [0.4, 5, 1.2]], color: shade(P.blue, -0.45) },
     ],
   });
-  DEFS.bluex.head = (P) => ({ skin: P.skin, hair: { style: "fade", color: P.hair }, eye: "#1a1210", brow: true, beard: P.hair, hood: P.black, stud: "#0e0e10" });
+  DEFS.bluex.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "fade", color: P.hair }, hood: P.black });
   DEFS.bluex.cloth = [{ kind: "chain", at: "waistFront", n: 6, seg: 4.5, color: "#9aa0a8", layer: "front" }];
 
   DEFS.voss = {
@@ -121,7 +121,7 @@ const Chars = (() => {
       { pts: [[0.03, 3], [0.03, 6.4], [0.12, 6.4], [0.12, 3]], color: P.blackL },
     ],
   });
-  DEFS.voss.head = (P) => ({ skin: P.skin, hair: { style: "swept", color: P.hair }, eye: "#2b3550", brow: true, lips: "#a5605a" });
+  DEFS.voss.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "swept", color: P.hair } });
   DEFS.voss.cloth = [
     { kind: "hair", at: "headTop", n: 9, seg: 7.4, w0: 11, w1: 3, color: "#d9dadf", color2: "#a7a9b1", layer: "back", gravity: 700, wind: 0.8, tie: "#2f5fc4" },
     { kind: "ribbon", at: "weapon", u: 84, v: 5, n: 6, seg: 6, w0: 3.4, w1: 2, color: "#2f5fc4", layer: "front", gravity: 500, flutter: 220 },
@@ -157,7 +157,7 @@ const Chars = (() => {
     ],
     mantle: { fur: P.fur, tint: P.furB },
   });
-  DEFS.barbarian.head = (P) => ({ skin: P.skin, helmet: { color: P.steel, light: P.steelL, trim: P.gold, horns: "#d8d2c4", visor: "#06080c" } });
+  DEFS.barbarian.head = (P) => ({ skin: P.skin, faceless: true, helmet: { color: P.steel, light: P.steelL, trim: P.gold, horns: "#d8d2c4", visor: "#06080c" } });
   DEFS.barbarian.cloth = [
     { kind: "cape", at: "shoulderBack", n: 8, seg: 10, w0: 26, w1: 14, color: "#1f3f6e", color2: "#5fb8ff", layer: "back", gravity: 700, flutter: 260, ragged: true },
     { kind: "hair", at: "headTop", n: 7, seg: 7, w0: 9, w1: 3, color: "#121216", layer: "back", gravity: 700, wind: 0.8, tie: "#c99a3a" },
@@ -193,7 +193,7 @@ const Chars = (() => {
     ],
     collar: P.jacket,
   });
-  DEFS.flame.head = (P) => ({ skin: P.skin, hair: { style: "sidecut", color: P.hair }, eye: P.eye, eyeGlow: true, brow: true, hoop: "#c9ccd3", lips: "#3f2620" });
+  DEFS.flame.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "sidecut", color: P.hair }, hoop: "#c9ccd3" });
   DEFS.flame.cloth = [{ kind: "braid", at: "headBack", n: 9, seg: 7, w0: 8, w1: 4, color: "#1c1d24", layer: "back", gravity: 1000, wind: 0.3, tie: "#8fc4ff" }];
 
   DEFS.dancer = {
@@ -231,7 +231,188 @@ const Chars = (() => {
     { kind: "ribbon", at: "armletFront", n: 4, seg: 6, w0: 5, w1: 2.6, color: "#f2c04c", layer: "front", gravity: 400, flutter: 200, phase: 1.6 },
   ];
 
-  const ORDER = ["cyborg", "bluex", "voss", "barbarian", "flame", "dancer"];
+  // ---------------- The five newer characters (from the later design sheets) ----------------
+  DEFS.veil = {
+    key: "veil", name: "CRIMSON VEIL", title: "Masked whip duelist", gender: "F", weapon: "sword", weaponDraw: "whip",
+    body: { torso: 52, headR: 10, neck: 8.6, upper: 25, fore: 24, thigh: 40, shin: 39, foot: 10.4, limb: [8.4, 7.2, 12.2, 9],
+      front: [5, 3, 6.8, 4.4], back: [7.4, 3.2, 4.6, 5], neckW: 5.8 },
+    style: { speedK: 1.04, tempo: 0.9, sway: 2.4 },
+    trail: "230, 60, 80",
+    pal: { outline: "#120a0c", skin: "#d8a888", hair: "#3a1a14", black: "#17121a", blackL: "#2b2329", red: "#b3122a", redD: "#760b1b",
+      gold: "#c9a24a", teal: "#2fd0c0", accent: "#b3122a" },
+  };
+  DEFS.veil.arms = (P) => {
+    const a = { upper: [[0, 1, 1.3, 1.34, P.black], [0.88, 1, 1.38, 1.4, P.red]], fore: [[0, 1, 1.0, 1.04, P.black], [0.5, 0.86, 1.2, 1.22, P.gold], [0.56, 0.8, 1.1, 1.12, P.black]],
+      hand: { type: "glove", color: P.black, accent: P.gold }, pad: { color: P.black, trim: P.gold, r: 8.6 } };
+    return { front: a, back: a };
+  };
+  DEFS.veil.legs = (P) => ({
+    thigh: [[0, 0.22, 1.12, 1.06, P.skin], [0.2, 1, 1.02, 0.96, P.black]], shin: [[0, 1, 1.0, 0.9, P.black], [0, 0.14, 1.16, 1.12, P.gold]],
+    strap: { seg: "thigh", t: 0.24, color: P.gold },
+    foot: { type: "boot", color: P.black, dark: "#0a080a", trim: P.gold, heel: P.red },
+  });
+  DEFS.veil.torso = (P) => ({
+    base: P.black,
+    bands: [[0, 0.16, P.black], [0.26, 0.48, P.red], [0.94, 1.08, P.black]],
+    shapes: [
+      { pts: [[0.26, -12], [0.26, 12], [0.29, 12], [0.29, -12]], color: P.gold },
+      { pts: [[0.45, -12], [0.45, 12], [0.48, 12], [0.48, -12]], color: P.gold },
+      { pts: [[0.33, 3.4], [0.37, 6.4], [0.41, 3.4], [0.37, 1.2]], color: P.teal, edge: P.gold },
+      { pts: [[0.62, 4.6], [0.92, 2.2], [0.92, 5.8], [0.76, 6.6]], color: P.skin },
+      { pts: [[0.6, 1.4], [0.96, -1.2], [0.96, 0.6], [0.62, 3]], color: P.gold },
+    ],
+    collar: P.black,
+  });
+  DEFS.veil.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "bob", color: P.hair }, mask: { kind: "veil", color: P.black, gold: P.gold, lens: P.teal } });
+  DEFS.veil.cloth = [
+    { kind: "cape", at: "shoulderBack", n: 7, seg: 9, w0: 14, w1: 18, color: "#b3122a", layer: "back", gravity: 750, flutter: 200 },
+    { kind: "panel", at: "waistBack", n: 5, seg: 7, w0: 14, w1: 16, color: "#17121a", layer: "back", gravity: 700, flutter: 120 },
+    { kind: "hair", at: "headBack", n: 3, seg: 6, w0: 11, w1: 8, color: "#3a1a14", layer: "back", gravity: 900, wind: 0.3 },
+  ];
+
+  DEFS.ronin = {
+    key: "ronin", name: "RONIN UNIT", title: "Cloaked cyborg swordsman", gender: "M", weapon: "sword", weaponDraw: "katana",
+    body: { torso: 57, headR: 10.8, neck: 8, upper: 27, fore: 26, thigh: 39, shin: 38, foot: 12.5, limb: [13, 11.4, 14.4, 12],
+      front: [6, 5.4, 10.4, 8], back: [7, 6, 8.6, 9.2], neckW: 9.6 },
+    style: { speedK: 1.0, tempo: 0.96, leanK: 1.05 },
+    trail: "255, 150, 70",
+    pal: { outline: "#0e0f12", armor: "#3c414a", armorL: "#5c636e", armorD: "#23262c", black: "#141518", cloak: "#d9d2c4", cloakD: "#a89f8e",
+      glow: "#ff8a2a", accent: "#ff8a2a", skin: "#5c636e" },
+  };
+  DEFS.ronin.arms = (P) => {
+    const a = { upper: [[0, 1, 1.06, 0.98, P.black], [0.2, 0.8, 1.14, 1.08, P.armor]], fore: [[0, 1, 1.04, 1.06, P.black], [0.1, 0.85, 1.16, 1.14, P.armorL]],
+      hand: { type: "mech", color: P.armor, dark: P.armorD }, pad: { color: P.armorL, trim: P.glow, r: 10.4 }, glow: P.glow };
+    return { front: a, back: Object.assign({}, a, { glow: null }) };
+  };
+  DEFS.ronin.legs = (P) => ({
+    thigh: [[0, 1, 1.06, 1, P.black], [0.15, 0.85, 1.12, 1.06, P.armor]], shin: [[0, 1, 1.02, 0.98, P.black], [0, 0.22, 1.24, 1.2, P.armorL], [0.28, 0.95, 1.12, 1.08, P.armor]],
+    glowLine: { seg: "shin", t0: 0.35, t1: 0.8, color: P.glow },
+    foot: { type: "boot", color: P.armor, dark: P.armorD, chunky: true },
+  });
+  DEFS.ronin.torso = (P) => ({
+    base: P.armorD,
+    bands: [[0.03, 0.15, P.black], [0.15, 0.2, P.armor]],
+    shapes: [
+      { pts: [[0.5, -10], [0.5, 6], [0.62, 10.6], [0.88, 10.8], [0.98, 7], [0.98, -10]], color: P.armor, edge: P.armorL },
+      { pts: [[0.24, -2], [0.24, 6], [0.46, 6.4], [0.46, -2]], color: P.armorL, edge: P.black },
+      { pts: [[0.7, 5.6], [0.74, 8.6], [0.78, 5.6], [0.74, 3.6]], color: P.glow },
+    ],
+    scabbard: { color: "#1a1b1f", trim: P.glow, hilt: "#2a2d33" },
+    collar: P.cloak,
+  });
+  DEFS.ronin.head = (P) => ({ skin: P.armorL, faceless: true, mask: { kind: "visor", color: P.armorL, plate: P.armorD, glow: P.glow }, hood: P.cloak });
+  DEFS.ronin.cloth = [
+    { kind: "cape", at: "shoulderBack", n: 9, seg: 10, w0: 24, w1: 20, color: "#d9d2c4", layer: "back", gravity: 750, flutter: 240, ragged: true },
+    { kind: "hair", at: "headBack", n: 4, seg: 7, w0: 13, w1: 10, color: "#c9c1b2", layer: "back", gravity: 800, wind: 0.6 },
+  ];
+
+  DEFS.reaver = {
+    key: "reaver", name: "SCARLET REAVER", title: "Axe berserker", gender: "F", weapon: "axe", weaponDraw: "reaverAxe",
+    body: { torso: 53, headR: 10.2, neck: 8.2, upper: 25.5, fore: 24.5, thigh: 39, shin: 38, foot: 11, limb: [10.4, 9, 13.6, 10.4],
+      front: [5.6, 3.4, 7, 4.8], back: [7.8, 3.8, 5.4, 6], neckW: 6.6 },
+    style: { speedK: 0.96, tempo: 1.0, leanK: 1.1, landK: 1.2 },
+    trail: "255, 90, 60",
+    pal: { outline: "#140a0a", skin: "#dca07c", hair: "#e2541c", hairL: "#f5efe6", red: "#a3121c", redD: "#6a0c12", black: "#18141a",
+      gold: "#c9a24a", tattoo: "#4a2a20", accent: "#e2541c" },
+  };
+  DEFS.reaver.arms = (P) => {
+    const a = { upper: [[0, 1, 1.02, 0.96, P.skin]], fore: [[0, 0.42, 1.0, 1.02, P.skin], [0.38, 1, 1.18, 1.22, P.red], [0.36, 0.46, 1.28, 1.28, P.redD]],
+      ink: P.tattoo, hand: { type: "glove", color: P.black, accent: P.red } };
+    return { front: Object.assign({ pad: { color: P.red, trim: P.gold, r: 11, demon: true } }, a), back: Object.assign({ pad: { color: P.redD, trim: P.gold, r: 10, demon: true } }, a) };
+  };
+  DEFS.reaver.legs = (P) => ({
+    thigh: [[0, 1, 1.12, 1.06, P.black]], shin: [[0, 0.4, 1.08, 1.02, P.black], [0.3, 1, 1.18, 1.2, P.red], [0.3, 0.4, 1.3, 1.28, P.redD]],
+    rips: { seg: "thigh", color: P.skin },
+    foot: { type: "boot", color: P.red, dark: P.redD, chunky: true },
+  });
+  DEFS.reaver.torso = (P) => ({
+    base: P.skin,
+    bands: [[0, 0.12, P.black], [0.08, 0.15, P.gold], [0.62, 0.9, P.red]],
+    shapes: [
+      { pts: [[0.3, 1], [0.3, 5], [0.34, 5], [0.34, 1]], color: "rgba(80, 40, 30, 0.35)" },
+      { pts: [[0.4, 1], [0.4, 5.4], [0.44, 5.4], [0.44, 1]], color: "rgba(80, 40, 30, 0.35)" },
+      { pts: [[0.09, 2], [0.09, 6], [0.14, 6], [0.14, 2]], color: "#e2c070" },
+    ],
+    collar: P.black,
+  });
+  DEFS.reaver.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "wild", color: P.hair, streak: P.hairL }, choker: P.black, hoop: "#c9ccd3" });
+  DEFS.reaver.cloth = [
+    { kind: "hair", at: "headBack", n: 10, seg: 7.6, w0: 14, w1: 4, color: "#e2541c", color2: "#ff8a4a", layer: "back", gravity: 850, wind: 0.5 },
+    { kind: "hair", at: "headTop", n: 8, seg: 7.4, w0: 6, w1: 2, color: "#f5efe6", layer: "back", gravity: 900, wind: 0.5, phase: 1.1 },
+    { kind: "panel", at: "waistFront", n: 6, seg: 8, w0: 11, w1: 9, color: "#a3121c", layer: "front", gravity: 700, flutter: 110, ragged: true },
+    { kind: "panel", at: "waistBack", n: 6, seg: 8, w0: 11, w1: 9, color: "#8a0f18", layer: "back", gravity: 700, flutter: 110, ragged: true },
+  ];
+
+  DEFS.varun = {
+    key: "varun", name: "VARUN BLOODMANE", title: "Hammer warrior", gender: "M", weapon: "axe", weaponDraw: "warHammer",
+    body: { torso: 60, headR: 11, neck: 7.6, upper: 28, fore: 27, thigh: 38, shin: 37, foot: 13, limb: [15.4, 13.4, 15.8, 12.8],
+      front: [7.2, 6.4, 12.4, 9.6], back: [8.2, 7, 10.8, 11], neckW: 11.6 },
+    style: { speedK: 0.88, tempo: 1.1, leanK: 1.15, landK: 1.35, breath: 2.2 },
+    trail: "255, 210, 120",
+    pal: { outline: "#100c0c", skin: "#e0ad86", hair: "#b3141c", black: "#1a181c", white: "#e9e4d8", whiteD: "#bdb5a2", gold: "#c9a24a",
+      goldD: "#8a6a2a", pants: "#1d1b21", accent: "#c9a24a" },
+  };
+  DEFS.varun.arms = (P) => {
+    const a = { upper: [[0, 1, 1.04, 0.96, P.skin]], fore: [[0, 0.5, 1.02, 1.02, P.skin], [0.5, 0.94, 1.14, 1.16, P.black], [0.52, 0.58, 1.22, 1.22, P.gold]],
+      hand: { type: "wrapped", color: P.skin, wrap: P.black } };
+    return { front: Object.assign({ pad: { color: P.gold, trim: P.goldD, r: 12.4 } }, a), back: a };
+  };
+  DEFS.varun.legs = (P) => ({
+    thigh: [[0, 1, 1.22, 1.16, P.pants]], shin: [[0, 0.5, 1.2, 1.12, P.pants], [0.42, 1, 1.12, 1.16, P.gold], [0.42, 0.5, 1.26, 1.24, P.goldD]],
+    foot: { type: "boot", color: P.goldD, dark: "#2a2116", chunky: true, trim: P.gold },
+  });
+  DEFS.varun.torso = (P) => ({
+    base: P.black,
+    bands: [[0.02, 0.18, P.gold], [0.06, 0.14, P.goldD]],
+    shapes: [
+      { pts: [[0.18, 10], [0.95, -9], [1.04, -5], [0.28, 11]], color: P.white, edge: P.gold },
+      { pts: [[0.7, 4], [0.98, 2], [0.98, 7], [0.82, 9]], color: P.skin },
+      { pts: [[0.3, -2], [0.3, 2], [0.62, 2], [0.62, -2]], color: "#2a272c" },
+    ],
+    collar: P.skin,
+  });
+  DEFS.varun.head = (P) => ({ skin: P.skin, faceless: true, hair: { style: "long", color: P.hair } });
+  DEFS.varun.cloth = [
+    { kind: "hair", at: "headBack", n: 10, seg: 7.8, w0: 16, w1: 5, color: "#b3141c", color2: "#d8303a", layer: "back", gravity: 900, wind: 0.45 },
+    { kind: "hair", at: "headTop", n: 6, seg: 7, w0: 9, w1: 3, color: "#9a1018", layer: "front", gravity: 950, wind: 0.4, phase: 0.8 },
+    { kind: "panel", at: "waistFront", n: 8, seg: 8.4, w0: 16, w1: 18, color: "#e9e4d8", layer: "front", gravity: 700, flutter: 120 },
+    { kind: "panel", at: "waistBack", n: 8, seg: 8.4, w0: 16, w1: 18, color: "#d8d2c4", layer: "back", gravity: 700, flutter: 120 },
+  ];
+
+  DEFS.grin = {
+    key: "grin", name: "GRIN", title: "Smiley-mask gunman", gender: "M", weapon: "fists", weaponDraw: "pistols",
+    body: { torso: 57, headR: 10.8, neck: 8, upper: 27, fore: 26, thigh: 39, shin: 38, foot: 12.5, limb: [13.4, 11.6, 14.8, 12.2],
+      front: [6.2, 5.6, 10.8, 8.2], back: [7.2, 6.2, 8.8, 9.4], neckW: 9.4 },
+    style: { speedK: 1.04, tempo: 0.96, leanK: 1.0 },
+    trail: "255, 200, 60",
+    pal: { outline: "#0c0c0e", skin: "#e8a920", black: "#17171b", blackL: "#28282e", yellow: "#e8a920", yellowD: "#a8740f", accent: "#e8a920" },
+  };
+  DEFS.grin.arms = (P) => {
+    const a = { upper: [[0, 1, 1.06, 0.98, P.black], [0.3, 0.75, 1.14, 1.1, P.blackL]], fore: [[0, 1, 1.02, 1.04, P.black], [0.25, 0.7, 1.16, 1.16, P.yellow]],
+      hand: { type: "glove", color: P.black, accent: P.yellowD } };
+    return { front: Object.assign({ pad: { color: P.yellow, trim: P.yellowD, r: 11, smiley: true } }, a), back: Object.assign({ pad: { color: P.yellowD, trim: P.black, r: 10, smiley: true } }, a) };
+  };
+  DEFS.grin.legs = (P) => ({
+    thigh: [[0, 1, 1.08, 1.02, P.black], [0.3, 0.8, 1.14, 1.08, P.yellow]], shin: [[0, 1, 1.02, 0.96, P.black], [0, 0.2, 1.26, 1.22, P.yellow]],
+    strap: { seg: "thigh", t: 0.2, color: P.blackL },
+    foot: { type: "boot", color: P.black, dark: "#060608", chunky: true },
+  });
+  DEFS.grin.torso = (P) => ({
+    base: P.black,
+    bands: [[0.03, 0.16, P.blackL]],
+    shapes: [
+      { pts: [[0.3, 2], [0.3, 7.4], [0.44, 8], [0.44, 2]], color: P.yellow, edge: P.yellowD },
+      { pts: [[0.48, 2], [0.48, 8.6], [0.62, 9.6], [0.62, 2]], color: P.yellow, edge: P.yellowD },
+      { pts: [[0.66, 2], [0.66, 10], [0.92, 9], [0.92, 2]], color: P.yellow, edge: P.yellowD },
+      { pts: [[0.2, -12], [0.98, 5], [0.98, 2], [0.24, -12]], color: P.blackL },
+      { pts: [[0.05, 6], [0.05, 9.4], [0.14, 9.4], [0.14, 6]], color: P.yellowD },
+    ],
+    scabbard: { color: "#1a1b1f", trim: P.yellow, hilt: "#2a2d33", two: true },
+  });
+  DEFS.grin.head = (P) => ({ skin: P.yellow, faceless: true, mask: { kind: "grin", color: P.yellow, dark: "#0a0a0c", shade: P.yellowD } });
+  DEFS.grin.cloth = [];
+
+  const ORDER = ["cyborg", "bluex", "voss", "barbarian", "flame", "dancer", "veil", "ronin", "reaver", "varun", "grin"];
   // Fill in the parts from each palette; the profile the controller needs.
   for (const k of ORDER) {
     const d = DEFS[k];
@@ -317,6 +498,7 @@ const Chars = (() => {
       case "headBack": return headPt(S, -0.9, 0.1);
       case "waistFront": return torsoPt(S, 0.06, (S.B.front[0] || 4) + 1);
       case "shoulderBack": return torsoPt(S, 0.95, -(S.B.back[3] || 6));
+      case "waistBack": return torsoPt(S, 0.06, -(S.B.back[0] || 6) - 1);
       case "weapon": return S.wpt(L.fh, p.w, it.c.u, it.c.v || 0);
       case "armletBack": return S.xf(lp(L.sb, L.be, 0.36), -1);
       case "armletFront": return S.xf(lp(L.sf, L.fe, 0.36), 1);
@@ -390,6 +572,7 @@ const Chars = (() => {
       fill([q(-4.5, 4.4), q(1, 6.8), q(-1, 7.6), q(-4.5, 6.6)], F.accent);
     } else if (F.dark) fill([q(-4.5, -1.5), q(f + 2, -1.5), q(f + 2, 0.6), q(-4.5, 0.6)], F.dark);
     if (F.trim) fill([q(-5, 5.5), q(2, 7.2), q(1, 8.4), q(-5, 7.2)], F.trim);
+    if (F.heel) fill([q(-4.5, 4), q(-1.5, 4), q(-2.5, 9.5), q(-4.5, 9.5)], F.heel);
   }
 
   function drawHand(ctx, S, hand, wrist, H, tint, ghost, open, t) {
@@ -443,6 +626,7 @@ const Chars = (() => {
     if (!ghost) {
       if (spec.glow) { boneLine(ctx, sJ, eJ, 0.15, 0.85, 1.6, spec.glow, 1.4, true); boneLine(ctx, eJ, hJ, 0.1, 0.9, -1.4, spec.glow, 1.4, true); }
       if (spec.tattoo) { boneLine(ctx, eJ, hJ, 0.15, 0.6, 1.2, spec.tattoo, 1.1, true); boneLine(ctx, sJ, eJ, 0.6, 0.95, -1, spec.tattoo, 1, true); }
+      if (spec.ink) { for (const [t0, t1, o] of [[0.2, 0.5, 1.6], [0.45, 0.8, -1.2], [0.15, 0.35, -2]]) boneLine(ctx, sJ, eJ, t0, t1, o, tint.c(spec.ink), 1.2); boneLine(ctx, eJ, hJ, 0.08, 0.3, 1, tint.c(spec.ink), 1.1); }
       if (spec.camo) camoDots(ctx, eJ, hJ, spec.camo.t0, spec.camo.t1, B.limb[1] * 1.2, tint.c("#2f5fc4"));
       if (spec.bangles) for (let k = 0; k < 4; k++) { const t = lerp(spec.bangles.t0, spec.bangles.t1, (k + 0.5) / 4); band(ctx, eJ, hJ, t - 0.012, t + 0.012, tint.c(spec.bangles.color), B.limb[1] * scaleW * 1.36); }
       if (spec.goldBand) band(ctx, eJ, hJ, spec.goldBand.t - 0.04, spec.goldBand.t + 0.04, tint.c("#c99a3a"), B.limb[1] * 1.16);
@@ -465,6 +649,18 @@ const Chars = (() => {
       const g = bands(ctx.createLinearGradient(l[0] * r, l[1] * r, -l[0] * r, -l[1] * r), 1, 1); ctx.fillStyle = g; ctx.fill(); }
     if (pad.camo) { ctx.fillStyle = tint.c("#2f5fc4"); for (const [x, y, rx] of [[-3, -2, 3.2], [3, 2.5, 2.4], [4, -3.5, 1.8]]) { ctx.beginPath(); ctx.ellipse(x, y, rx, rx * 0.7, 0.5, 0, Math.PI * 2); ctx.fill(); } }
     ctx.strokeStyle = tint.c(pad.trim); ctx.lineWidth = 1.8; ctx.beginPath(); ctx.ellipse(0, 0, r * 0.95 - 1.5, r * 0.78 - 1.5, 0, Math.PI * 0.1, Math.PI * 0.9); ctx.stroke();
+    if (pad.demon) {
+      // A demon face pad: two horns and two yellow eyes.
+      ctx.fillStyle = tint.c("#e9e6df");
+      for (const sg of [-1, 1]) { ctx.beginPath(); ctx.moveTo(-r * 0.5, sg * r * 0.5); ctx.lineTo(-r * 1.25, sg * r * 0.95); ctx.lineTo(-r * 0.2, sg * r * 0.7); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = tint.c("#ffcc33"); for (const sg of [-1, 1]) { ctx.beginPath(); ctx.arc(-r * 0.1, sg * r * 0.3, 1.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+    if (pad.smiley) {
+      // The smiley badge on Grin's shoulders.
+      ctx.fillStyle = tint.c("#17171b");
+      for (const sg of [-1, 1]) { ctx.beginPath(); ctx.arc(-r * 0.2, sg * r * 0.25, 1.3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = tint.c("#17171b"); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(-r * 0.05, 0, r * 0.45, -Math.PI * 0.35 + Math.PI, Math.PI * 0.35 + Math.PI); ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -482,6 +678,7 @@ const Chars = (() => {
       if (spec.strap && (!spec.strap.front || which === "front")) { const [x, y, w] = segs[spec.strap.seg]; const q = lp(x, y, spec.strap.t); band(ctx, x, y, spec.strap.t - 0.05, spec.strap.t + 0.05, tint.c(spec.strap.color), w * 1.2); Rig.dot(ctx, q, 1.6, tint.c("#8a9099")); }
       if (spec.camo) { const [x, y, w] = segs[spec.camo.seg]; camoDots(ctx, x, y, spec.camo.t0, spec.camo.t1, w * 1.2, tint.c("#2f5fc4")); }
       if (spec.kneeTrim) boneLine(ctx, k, a, 0.02, 0.18, side * 2.5, tint.c(spec.kneeTrim), 1.6);
+      if (spec.rips) { const [x, y, w] = segs[spec.rips.seg]; for (const [t, o, l] of [[0.3, -0.2, 0.08], [0.55, 0.15, 0.1], [0.75, -0.1, 0.07]]) boneLine(ctx, x, y, t, t + l, o * w, tint.c(spec.rips.color), 2.2); }
       if (spec.wraps) { const [x, y, w] = segs[spec.wraps.seg]; for (let i = 0; i < 6; i++) { const t = lerp(spec.wraps.t0, spec.wraps.t1, i / 5); band(ctx, x, y, t - 0.008, t + 0.008, tint.c(spec.wraps.color), w * 0.8); } }
       if (spec.goldBand) { const [x, y, w] = segs[spec.goldBand.seg]; band(ctx, x, y, spec.goldBand.t - 0.03, spec.goldBand.t + 0.03, tint.c("#c99a3a"), w * 1.18); }
     }
@@ -547,6 +744,17 @@ const Chars = (() => {
     ctx.restore();
   }
 
+  // A sheath (or two blade hilts) carried across the back, drawn behind the body.
+  function drawScabbard(ctx, S, Sc, tint) {
+    const runs = Sc.two ? [[0.2, 1.22, -0.5], [0.3, 1.2, 0.4]] : [[0.12, 1.2, 0]];
+    for (const [t0, t1, o] of runs) {
+      const a = torsoPt(S, t0, -S.B.back[1] - 4 + o * 6), b = torsoPt(S, t1, -S.B.back[3] + 6 + o * 6);
+      capsule(ctx, a, b, 3.6 + OL, 3 + OL, EDGE); capsule(ctx, a, b, 3.6, 3, tint.c(Sc.color));
+      boneLine(ctx, a, b, 0.1, 0.12, 0, tint.c(Sc.trim), 7.6, false, "butt");
+      const h = lp(a, b, 1.12); capsule(ctx, b, h, 2.6, 2.6, tint.c(Sc.hilt));
+    }
+  }
+
   // The barbarian's fur mantle over the shoulders.
   function drawMantle(ctx, S, M, tint, ghost) {
     const pts = [];
@@ -587,6 +795,7 @@ const Chars = (() => {
       : [[-0.95, 0.18], [-0.8, 0.8], [-0.3, 1.04], [0.32, 1.0], [0.76, 0.7], [0.9, 0.36], [0.94, 0.2], [0.9, 0.08], [0.98, -0.04], [1.12, -0.2], [0.94, -0.3], [0.96, -0.42], [0.88, -0.52], [0.9, -0.62], [0.82, -0.72], [0.86, -0.92], [0.58, -1.04], [0.2, -0.98], [-0.12, -0.7], [-0.2, -0.5], [-0.6, -0.44], [-0.94, -0.12]];
     shape(skull, H.skin, true, !fem && !H.faceless);
     if (ghost) return;
+    if (H.mask) { drawMask(ctx, S, H, tint, shape, hp); return; }
     if (H.helmet) {
       const h = H.helmet;
       shape([[-1.08, -0.2], [-1.05, 0.55], [-0.5, 1.08], [0.25, 1.1], [0.8, 0.7], [1.05, 0.15], [1.04, -0.55], [0.6, -1.0], [-0.2, -1.05], [-0.8, -0.8]], h.color);
@@ -606,12 +815,26 @@ const Chars = (() => {
       if (hr.style === "fade") shape([[-1.0, -0.1], [-0.95, 0.6], [-0.4, 1.06], [0.4, 1.06], [0.85, 0.65], [0.5, 0.5], [-0.4, 0.25], [-0.8, -0.35]], hr.color);
       if (hr.style === "swept") shape([[-1.08, -0.4], [-1.05, 0.6], [-0.5, 1.12], [0.3, 1.12], [0.85, 0.7], [1.0, 0.25], [0.55, 0.55], [0.0, 0.5], [-0.55, 0.0], [-0.75, -0.8]], hr.color);
       if (hr.style === "sidecut") shape([[-1.05, -0.5], [-1.05, 0.55], [-0.5, 1.1], [0.35, 1.1], [0.9, 0.7], [1.05, 0.1], [0.75, -0.25], [0.55, 0.45], [-0.1, 0.45], [-0.6, -0.1], [-0.8, -0.9]], hr.color);
+      if (hr.style === "bob") {
+        // Crimson Veil: a short, full bob that frames the mask.
+        shape([[-1.12, -0.7], [-1.12, 0.5], [-0.6, 1.12], [0.3, 1.14], [0.86, 0.78], [1.02, 0.36], [0.62, 0.55], [0.1, 0.56], [-0.2, 0.0], [-0.38, -0.82], [-0.8, -1.0]], hr.color);
+      }
+      if (hr.style === "wild") {
+        // Scarlet Reaver: a big, wild mane swept back, with a white streak at the front.
+        shape([[-1.2, -0.6], [-1.3, 0.4], [-0.9, 1.1], [-0.3, 1.32], [0.3, 1.24], [0.8, 0.98], [1.06, 0.56], [0.7, 0.62], [0.95, 0.3], [0.45, 0.45], [-0.2, 0.3], [-0.55, -0.3], [-0.9, -1.1]], hr.color);
+        if (hr.streak) shape([[0.1, 1.2], [0.55, 1.1], [0.95, 0.62], [0.62, 0.66], [0.2, 0.9]], hr.streak, false);
+      }
+      if (hr.style === "long") {
+        // Varun: long red hair, parted, falling over the forehead and down the back.
+        shape([[-1.1, -0.9], [-1.1, 0.5], [-0.55, 1.1], [0.3, 1.12], [0.85, 0.76], [1.02, 0.2], [0.82, -0.1], [0.66, 0.45], [0.1, 0.55], [-0.35, 0.1], [-0.6, -1.1]], hr.color);
+      }
       if (hr.style === "bun") {
         shape([[-1.06, -0.6], [-1.05, 0.55], [-0.5, 1.08], [0.35, 1.08], [0.9, 0.68], [0.98, 0.3], [0.4, 0.62], [-0.3, 0.45], [-0.75, -0.2], [-0.9, -1.0]], hr.color);
         shape([[-0.75, 0.95], [-0.45, 1.5], [0.0, 1.45], [0.05, 1.05]], hr.color);
         if (hr.tie) { const q = hp(-0.35, 1.12); Rig.dot(ctx, q, 2.6, tint.c(hr.tie)); }
       }
     }
+    if (H.choker) { const a = hp(-0.3, -0.86), b = hp(0.4, -1.02); ctx.strokeStyle = tint.c(H.choker); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
     if (H.faceless) return earring(ctx, S, H, tint);
     if (H.beard) shape([[0.05, -0.15], [0.6, -0.28], [0.9, -0.5], [0.92, -0.62], [0.86, -0.96], [0.56, -1.08], [0.18, -1.0], [-0.14, -0.7], [-0.22, -0.3]], H.beard, false, true);
     const stroke = (list, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); list.forEach(([f, u], i) => { const q = hp(f, u); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); };
@@ -632,6 +855,52 @@ const Chars = (() => {
     if (!fem && !H.beard) stroke([[0.16, -0.9], [-0.1, -0.66]], "rgba(12, 8, 24, 0.22)", 1.4);
     if (H.stud) Rig.dot(ctx, hp(-0.15, -0.05), 1.2, tint.c(H.stud));
     earring(ctx, S, H, tint);
+  }
+  // Masks and helmets that cover the face (the masked fighters on the sheets). Head frame: f forward, u up.
+  function drawMask(ctx, S, H, tint, shape, hp) {
+    const m = H.mask, line = (list, col, w, glow) => {
+      ctx.save();
+      if (glow) { ctx.globalCompositeOperation = "lighter"; ctx.strokeStyle = col; ctx.globalAlpha = 0.45; ctx.lineWidth = w + 4; ctx.beginPath(); list.forEach(([f, u], i) => { const q = hp(f, u); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round"; ctx.beginPath(); list.forEach(([f, u], i) => { const q = hp(f, u); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke();
+      ctx.restore();
+    };
+    if (m.kind === "veil") {
+      // Crimson Veil: the bob behind, then a black mask over the whole face with a gold crest down the front
+      // and a teal eye lens.
+      const hr = H.hair;
+      shape([[-1.12, -0.7], [-1.12, 0.5], [-0.6, 1.12], [0.3, 1.14], [0.8, 0.8], [0.4, 0.62], [-0.2, 0.0], [-0.38, -0.82], [-0.8, -1.0]], hr.color);
+      shape([[0.12, 0.8], [0.6, 0.82], [0.95, 0.5], [1.06, 0.06], [1.0, -0.36], [0.84, -0.72], [0.48, -0.94], [0.12, -0.66], [0.02, 0.1]], m.color);
+      shape([[0.44, 1.0], [0.7, 0.84], [0.98, 0.42], [1.07, 0.04], [0.94, 0.1], [0.72, 0.5], [0.42, 0.78]], m.gold, false);
+      shape([[0.95, -0.2], [1.02, -0.36], [0.86, -0.72], [0.8, -0.56]], m.gold, false);
+      const e = hp(0.76, 0.14);
+      ctx.save(); ctx.globalCompositeOperation = "lighter"; Rig.dot(ctx, e, S.B.headR * 0.28, "rgba(47, 208, 192, 0.35)"); ctx.restore();
+      ctx.fillStyle = tint.c(m.lens); ctx.beginPath(); ctx.ellipse(e[0], e[1], S.B.headR * 0.16, S.B.headR * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+      // Front hair falls over the mask's top edge.
+      shape([[-0.2, 1.1], [0.35, 1.16], [0.8, 0.86], [0.56, 0.7], [0.2, 0.8], [-0.1, 0.6]], hr.color, false);
+    } else if (m.kind === "visor") {
+      // Ronin Unit: a smooth armored helmet, a dark face plate and the glowing orange V slit.
+      if (H.hood) shape([[-1.3, -0.4], [-1.25, 0.7], [-0.8, 1.15], [-0.3, 0.9], [-0.4, -0.2], [-0.2, -1.1], [-0.9, -1.2]], H.hood);
+      shape([[-1.04, -0.3], [-1.02, 0.55], [-0.5, 1.08], [0.25, 1.1], [0.82, 0.74], [1.06, 0.2], [1.06, -0.4], [0.82, -0.86], [0.3, -1.02], [-0.3, -0.84], [-0.8, -0.7]], m.color);
+      shape([[0.32, 0.42], [0.86, 0.56], [1.07, 0.18], [1.07, -0.42], [0.82, -0.88], [0.42, -0.98], [0.3, -0.3]], m.plate, false);
+      line([[0.4, 0.34], [0.78, 0.08], [1.04, 0.0]], m.glow, 1.8, true);
+      line([[0.56, -0.5], [0.96, -0.56]], tint.c("#0b0c0f"), 1); line([[0.56, -0.66], [0.9, -0.72]], tint.c("#0b0c0f"), 1);
+      line([[-0.6, 0.2], [-0.2, 0.9]], tint.c(shade(m.color, 0.2)), 1.2);
+      if (H.hood) shape([[-0.8, -0.6], [0.2, -1.05], [0.5, -1.2], [0.1, -1.4], [-0.6, -1.25], [-1.0, -0.9]], H.hood);
+    } else if (m.kind === "grin") {
+      // Grin: a yellow full-head mask, a black eye hole and a wide jagged grin.
+      shape([[-1.0, -0.2], [-0.98, 0.6], [-0.5, 1.08], [0.25, 1.1], [0.8, 0.74], [1.02, 0.22], [1.04, -0.36], [0.86, -0.82], [0.4, -1.04], [-0.2, -0.9], [-0.7, -0.66]], m.color);
+      const poly = (list, col) => { polyPath(ctx, list.map(([f, u]) => hp(f, u))); ctx.fillStyle = tint.c(col); ctx.fill(); };
+      poly([[0.48, 0.4], [0.86, 0.26], [1.0, 0.1], [0.92, -0.04], [0.6, 0.06]], m.dark);
+      poly([[0.3, -0.24], [1.02, -0.34], [1.0, -0.66], [0.84, -0.78], [0.36, -0.58]], m.dark);
+      // Teeth: two jagged rows.
+      const teeth = [];
+      for (let i = 0; i < 6; i++) { const f = 0.36 + i * 0.11; teeth.push([f, -0.28 - i * 0.02], [f + 0.055, -0.44 - i * 0.02]); }
+      poly([[0.34, -0.26]].concat(teeth, [[1.0, -0.36]]), m.color);
+      const low = [];
+      for (let i = 0; i < 5; i++) { const f = 0.42 + i * 0.11; low.push([f, -0.68 + i * 0.01], [f + 0.055, -0.52 + i * 0.01]); }
+      poly([[0.38, -0.62]].concat(low, [[0.96, -0.62], [0.88, -0.76], [0.4, -0.66]]), m.color);
+      line([[-0.7, 0.3], [-0.2, 0.95]], tint.c(m.shade), 1.4);
+    }
   }
   function earring(ctx, S, H, tint) {
     if (!H.hoop) return;
@@ -690,12 +959,14 @@ const Chars = (() => {
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     const layer = (name, tint) => { if (!ghost) for (const it of cloth) if ((it.c.layer || "back") === name) drawStrand(ctx, it, tint, null); };
     const W = Rig.WEAPONS[def.weapon], twoHanded = W && W.hands === 2 && !W.fists && !W.dual;
-    const weapon = () => { if (def.weaponDraw) Rig.WEAPON_DRAW[def.weaponDraw](ctx, S, S.L.fh, p.w, P.accent, P); };
+    const weapon = () => { if (def.weaponDraw) Rig.WEAPON_DRAW[def.weaponDraw](ctx, S, S.L.fh, p.w, P.accent, P, "front"); };
 
     layer("back", back);
+    if (parts.torso.scabbard && !ghost) drawScabbard(ctx, S, parts.torso.scabbard, front);
     if (S.B.arms4) drawArm(ctx, S, "lowerB", parts.arms.lower, back, ghost, opt);
     drawLeg(ctx, S, "back", parts.legs, back, ghost);
     const bArm = drawArm(ctx, S, "back", parts.arms.back, back, ghost, opt);
+    if (def.weaponDraw === "pistols" && !ghost) Rig.WEAPON_DRAW.pistols(ctx, S, S.L.fh, p.w, P.accent, P, "back");
     drawPad(ctx, S, "back", parts.arms.back.pad, back, ghost);
     drawTorso(ctx, S, parts.torso, front, ghost);
     if (parts.torso.mantle) drawMantle(ctx, S, parts.torso.mantle, front, ghost);

@@ -83,7 +83,7 @@
       { name: "Ten Hit: Supernova Sequence", inputs: ["2", "2", "1", "1", "3", "3", "4", "1", "f+2", "1+2"], steps: ["palm"].concat(tenIds.slice(1)) },
     ],
     juggles: [
-      { name: "Flame Pillar, Flicker Bolt, Ember Palm, Comet", notation: "df+2, 1, 2, f+2", steps: ["pillar", "bolt", "palm", "comet"] },
+      { name: "Flame Pillar, Flicker Bolt twice, Comet", notation: "df+2, 1, 1, f+2", steps: ["pillar", "bolt", "bolt", "comet"] },
       { name: "Rising Flame, bolt, Nova Burst", notation: "df+1, 1, 1+2", steps: ["rising", "bolt", "burst"] },
       { name: "Pyre launch, Orb Barrage", notation: "1,2,df+2, d,df,f+1", pre: 3, steps: ["barrage"] },
     ],

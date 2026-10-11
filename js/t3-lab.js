@@ -311,7 +311,7 @@
   // ---------- Loop ----------
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now; // never negative (the first frame stamp can predate the script finishing)
     if (!lab.paused) {
       lab.acc += dt * (lab.slow ? 0.25 : 1) * (S.cine ? 0.75 : 1);
       while (lab.acc >= STEP) { tick(STEP); lab.acc -= STEP; }

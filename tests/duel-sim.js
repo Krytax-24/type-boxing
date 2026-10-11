@@ -1,8 +1,8 @@
 // Headless checks for the duel rules. No browser, no libraries.
 // Run from the project folder:   node tests/duel-sim.js
-//   optional numbers: matches per cell for the calibration table, per bot for the beat-at check, per weapon pair
-//   (default 40 300 300; e.g. node tests/duel-sim.js 0 0 0 runs only the rule checks)
-// Part 1 checks the rules. Part 2 calibrates the bots against a simulated player. Part 3 plays weapon pairs at equal skill.
+//   optional numbers: matches per cell for the calibration table and per bot for the beat-at check
+//   (default 40 300; e.g. node tests/duel-sim.js 0 0 runs only the rule checks)
+// Part 1 checks the rules. Part 2 calibrates the bots against a simulated player.
 const fs = require("fs"), path = require("path"), vm = require("vm");
 const root = path.join(__dirname, "..");
 
@@ -114,66 +114,26 @@ console.log("Counter");
   check("a stunned typist stays at power 0", foe.countering(duel.t) && foe.power(duel.t) === 0);
 }
 
-// ---------- Part 1c: weapons ----------
-console.log("Weapons");
+// ---------- Part 1c: one rule set ----------
+// The Light and Heavy weapon tiers were removed: every typist uses the one rule set (the old Medium).
+console.log("One rule set");
 {
-  const g = load(), D = g.CONFIG.duel;
-  const W = (id) => g.weaponFor(id);
+  const g = load(), D = g.CONFIG.duel, W = g.weaponFor("medium");
   const words = (d, side) => d.streams[side].words.map((w) => w.text);
-  const a = new g.Duel(), b = new g.Duel();
-  a.start(42, ["light", "heavy"]); b.start(42, ["light", "heavy"]);
-  check("same seed and weapons give the same words and ultimate words",
-    words(a, 0).join() === words(b, 0).join() && words(a, 1).join() === words(b, 1).join() &&
-    a.streams[0].source.hardWord() === b.streams[0].source.hardWord() && a.streams[1].source.hardWord() === b.streams[1].source.hardWord());
-  check("Light words are easy common words of 2 to 4 letters (no q x z j, no same-finger pairs)",
-    words(a, 0).every((w) => g.COMMON_WORDS.includes(w) && w.length >= 2 && w.length <= 4 && g.easyWord(w)) &&
-    !g.LIGHT_POOL.includes("kill") && !g.LIGHT_POOL.includes("my") && g.LIGHT_POOL.length >= 100);
-  check("Heavy words come from the greatsword list (7 to 12 letters)", words(a, 1).every((w) => g.GREATSWORD_WORDS.includes(w) && w.length >= 7 && w.length <= 12));
-  check("greatsword list has at least 150 unique words of 7 to 12 letters",
-    g.GREATSWORD_WORDS.length >= 150 && new Set(g.GREATSWORD_WORDS).size === g.GREATSWORD_WORDS.length && g.GREATSWORD_WORDS.every((w) => /^[a-z]{7,12}$/.test(w)));
-  const ults = (id, n) => { const d = new g.Duel(); d.start(5, [id, id]); const s = d.streams[0].source; return Array.from({ length: n }, () => s.hardWord()); };
-  check("Light ultimate words are 6 to 8 letters", ults("light", 50).every((w) => g.LIGHT_ULT_WORDS.includes(w) && w.length >= 6 && w.length <= 8));
-  check("Medium ultimate words are HARD_WORDS", ults("medium", 50).every((w) => g.HARD_WORDS.includes(w)));
-  check("Heavy ultimate words are 11 letters or more", ults("heavy", 50).every((w) => g.GREATSWORD_ULT_WORDS.includes(w) && w.length >= 11));
-  const m = new g.Duel(), o = new g.Duel(); m.start(42, ["medium", "medium"]); o.start(42);
-  check("Medium uses the original words (same as no weapon)", words(m, 0).join() === words(o, 0).join() && words(m, 1).join() === words(o, 1).join());
-  check("Medium numbers are the globals", W("medium").power === 1 && W("medium").wordsPerCombo === D.wordsPerCombo &&
-    W("medium").comboRequired === D.ultimate.comboRequired && W("medium").mistakeCharge === D.ultimate.mistakeCharge);
-  check("a bot without a weapon uses Medium", g.CONFIG.weapons.botWeapon === "medium");
-
-  // Clean words to combo x1 and to the ultimate, per weapon.
-  const reach = (id) => {
-    const d = new g.Duel(); d.start(9, [id, "medium"]); fight(g, d);
-    const me = d.typists[0]; me.charge = 100;
-    let toCombo = 0, toUlt = 0;
-    for (let n = 1; n <= 40 && !toUlt; n++) {
-      typeWord(d, 0); me.charge = 100;
-      if (!toCombo && me.comboLevel >= 1) toCombo = n;
-      if (me.ultReady()) toUlt = n;
-    }
-    return [toCombo, toUlt];
-  };
-  const [hc, hu] = reach("heavy"), [lc, lu] = reach("light"), [mc, mu] = reach("medium");
-  check(`Heavy: combo x1 after 3 clean words (${hc}), ultimate after 3 (${hu})`, hc === 3 && hu === 3);
-  check(`Light: combo x1 after 5 (${lc}), ultimate after 15 (${lu})`, lc === 5 && lu === 15);
-  check(`Medium: combo x1 after 5 (${mc}), ultimate after 10 (${mu})`, mc === 5 && mu === 10);
-
-  // Power multiplier and mistake charge.
-  const d = new g.Duel(); d.start(3, ["heavy", "light"]); fight(g, d);
-  for (const t of d.typists) { t.stamps = []; t.firstStamp = d.t - 4; for (let k = 0; k < 20; k++) t.stamps.push(d.t - k * 0.15); }
-  const [hv, lt] = d.typists, close = (x, y) => Math.abs(x - y) < 1e-9;
-  check(`the power multiplier applies (heavy x${W("heavy").power}, light x${W("light").power})`,
-    close(hv.power(d.t), hv.wpm(d.t) * W("heavy").power) && close(lt.power(d.t), lt.wpm(d.t) * W("light").power));
-  hv.charge = 50; lt.charge = 50; hv.wrong(d.t); lt.wrong(d.t);
-  check("mistake charge comes from the weapon", close(hv.charge, 50 - W("heavy").mistakeCharge) && close(lt.charge, 50 - W("light").mistakeCharge));
-  hv.counterUntil = d.t + 1; hv.stunUntil = d.t + 1;
-  check("a stun still means power 0 with any weapon", hv.power(d.t) === 0);
-  check(`power multipliers stay in their ranges (light ${W("light").power} in 0.80 to 0.95, heavy ${W("heavy").power} in 1.10 to 1.35)`,
-    W("light").power >= 0.8 && W("light").power <= 0.95 && W("heavy").power >= 1.1 && W("heavy").power <= 1.35);
-  const h0 = new g.Duel(); h0.start(4, ["heavy", "medium"]); fight(g, h0);
-  h0.typists[0].charge = 99;
-  for (let i = 0; i < 3; i++) typeWord(h0, 0);
-  check("Heavy at combo x1 still needs a full gold bar", h0.typists[0].comboLevel === 1 && !h0.typists[0].ultReady());
+  check("only one rule set is left", g.CONFIG.weapons.list.length === 1 && g.CONFIG.weapons.list[0].id === "medium");
+  check("its numbers are the globals", W.power === 1 && W.comboBonus === D.comboBonus && W.wordsPerCombo === D.wordsPerCombo &&
+    W.comboRequired === D.ultimate.comboRequired && W.mistakeCharge === D.ultimate.mistakeCharge);
+  check("an old saved weapon id falls back to it", g.weaponFor("heavy").id === "medium" && g.weaponFor("light").id === "medium");
+  const a = new g.Duel(), b = new g.Duel(); a.start(42); b.start(42);
+  check("same seed gives the same words and ultimate words", words(a, 0).join() === words(b, 0).join() && words(a, 1).join() === words(b, 1).join() &&
+    a.streams[0].source.hardWord() === b.streams[0].source.hardWord());
+  const u = new g.Duel(); u.start(5); const src = u.streams[0].source;
+  check("ultimate words are HARD_WORDS", Array.from({ length: 50 }, () => src.hardWord()).every((w) => g.HARD_WORDS.includes(w)));
+  const d = new g.Duel(); d.start(9); fight(g, d);
+  const me = d.typists[0]; let toCombo = 0, toUlt = 0;
+  for (let n = 1; n <= 40 && !toUlt; n++) { typeWord(d, 0); me.charge = 100; if (!toCombo && me.comboLevel >= 1) toCombo = n; if (me.ultReady()) toUlt = n; }
+  check(`combo x1 after 5 clean words (${toCombo}), ultimate after 10 (${toUlt})`, toCombo === 5 && toUlt === 10);
+  check("no bot carries a weapon", D.bots.every((x) => x.weapon === undefined) && D.matchMe.weapon === undefined);
 }
 
 // ---------- Part 1d: bots ----------
@@ -182,7 +142,8 @@ console.log("Bots");
   const g = load(), B = g.CONFIG.duel.bots, M = g.CONFIG.duel.matchMe;
   check("six levels at about 30, 45, 60, 75, 90 and 110 wpm", B.length === 6 && B.map((b) => b.beatAt).join() === "30,45,60,75,90,110");
   check("each level has a personality (style, accuracy, recovery, drift)", B.every((b) => b.style && b.accuracy > 0.8 && b.recovery.length === 2 && b.drift >= 0) &&
-    new Set(B.map((b) => b.style)).size === 6 && B.some((b) => b.weapon === "heavy"));
+    new Set(B.map((b) => b.style)).size === 6);
+  check("each bot plays as a fighter, all different", B.every((b) => typeof b.char === "string") && new Set(B.map((b) => b.char).concat([M.char])).size === 7);
   check("MATCH ME: last 3 matches, starts at 50 wpm", M.history === 3 && M.start === 50 && M.storageKey);
   // Recovery is a bot setting: a bot that always misses waits at least recovery[0] after each typo.
   const d = new g.Duel(); d.start(8); fight(g, d);
@@ -197,14 +158,14 @@ console.log("Bots");
 }
 
 // ---------- Part 2: bot calibration ----------
-// The simulated player: a Bot typing at 96% accuracy with the Bo staff and the default typo recovery, its key
+// The simulated player: a Bot typing at 96% accuracy with the default typo recovery, its key
 // rate set by Bot.rawWpmFor so its MEASURED average (correct keystrokes only, like the result screen) is the
 // given wpm. A bot is calibrated when that player, at the bot's `beatAt`, wins 45 to 55%.
 const NC = process.argv[2] !== undefined ? +process.argv[2] : 40, NB = process.argv[3] !== undefined ? +process.argv[3] : 300;
-const playerCfg = (g, wpm) => { const c = { accuracy: 0.96, weapon: "medium" }; c.wpm = g.Bot.rawWpmFor(wpm, c); return c; };
+const playerCfg = (g, wpm) => { const c = { accuracy: 0.96 }; c.wpm = g.Bot.rawWpmFor(wpm, c); return c; };
 function botVs(g, playerWpm, botCfg) {
   const duel = new g.Duel();
-  duel.start((Math.random() * 1e9) | 0, ["medium", botCfg.weapon || g.CONFIG.weapons.botWeapon]);
+  duel.start((Math.random() * 1e9) | 0);
   const bots = [
     new g.Bot(playerCfg(g, playerWpm), duel.streams[0], (e, t) => duel.handleEvents(0, e, t)),
     new g.Bot(botCfg, duel.streams[1], (e, t) => duel.handleEvents(1, e, t)),
@@ -217,7 +178,7 @@ function botVs(g, playerWpm, botCfg) {
   return { t: duel.t, won: duel.result ? duel.result.winner === 0 : Math.random() < 0.5 };
 }
 function soloWpm(g, cfg, secs) {
-  const d = new g.Duel(); d.start((Math.random() * 1e9) | 0, [cfg.weapon || "medium", "medium"]); fight(g, d);
+  const d = new g.Duel(); d.start((Math.random() * 1e9) | 0); fight(g, d);
   const b = new g.Bot(cfg, d.streams[0], (e, t) => d.handleEvents(0, e, t)); b.nextKeyAt = 0.5;
   for (let t = 0; t < secs; t += STEP) { d.t = t; b.update(t); }
   const s = d.typists[0].stats; return s.correct / 5 / ((s.lastKeyAt - s.firstKeyAt) / 60);
@@ -227,7 +188,7 @@ const matchBot = (target) => { const M = g.CONFIG.duel.matchMe; const c = Object
 const calBots = g.CONFIG.duel.bots.concat([Object.assign(matchBot(50), { name: "MATCH ME 50" }), Object.assign(matchBot(90), { name: "MATCH ME 90" })]);
 if (NC > 0) {
   const speeds = [30, 45, 60, 75, 90, 110, 130];
-  console.log(`\nCalibration table (${NC} matches per cell): win% of a simulated player at 96% accuracy, Bo staff`);
+  console.log(`\nCalibration table (${NC} matches per cell): win% of a simulated player at 96% accuracy`);
   console.log("player wpm  " + calBots.map((b) => b.name.padEnd(12)).join(""));
   for (const w of speeds) {
     const cells = calBots.map((b) => { let won = 0; for (let k = 0; k < NC; k++) if (botVs(g, w, b).won) won++; return Math.round((100 * won) / NC) + "%"; });
@@ -242,51 +203,8 @@ if (NB > 0) {
     lens.sort((x, y) => x - y);
     const pct = (100 * won) / NB, ok = pct >= 45 && pct <= 55;
     console.log(`  ${b.name.padEnd(12)} beat it at about ${String(b.beatAt).padStart(3)} wpm: player wins ${pct.toFixed(0)}%  ` +
-      `(bot ${b.wpm.toFixed(0)} raw wpm, ${Math.round(b.accuracy * 100)}%, ${b.weapon || "medium"}; median ${lens[lens.length >> 1].toFixed(0)} s)  ${ok ? "ok" : "OUTSIDE 45 to 55"}`);
+      `(bot ${b.wpm.toFixed(0)} raw wpm, ${Math.round(b.accuracy * 100)}%; median ${lens[lens.length >> 1].toFixed(0)} s)  ${ok ? "ok" : "OUTSIDE 45 to 55"}`);
   }
 }
-// ---------- Part 3: weapon pairs at equal skill ----------
-// MODELLING ASSUMPTIONS (sim only, not game rules; GUESSES, to replace with measured numbers after real play):
-// easier words are typed faster and cleaner, harder words slower and sloppier. Light's pool is now truly easy
-// (2 to 4 letters, no awkward pairs), so the guess is 6% faster and 1 point more accurate; Heavy 8% slower and
-// 1.5 points less accurate.
-const TYPING_MODEL = {
-  light:  { speed: 1.06, accuracy: 0.01 },   // GUESS
-  medium: { speed: 1.00, accuracy: 0 },
-  heavy:  { speed: 0.92, accuracy: -0.015 }, // GUESS
-};
-const NW = process.argv[4] !== undefined ? +process.argv[4] : 300;
-function weaponMatch(g, wpm, acc, wa, wb, seed) {
-  const duel = new g.Duel();
-  duel.start(seed, [wa, wb]);
-  const cfg = (w) => ({ wpm: wpm * TYPING_MODEL[w].speed, accuracy: acc + TYPING_MODEL[w].accuracy });
-  const bots = [
-    new g.Bot(cfg(wa), duel.streams[0], (e, t) => duel.handleEvents(0, e, t)),
-    new g.Bot(cfg(wb), duel.streams[1], (e, t) => duel.handleEvents(1, e, t)),
-  ];
-  bots[0].nextKeyAt = 0.5; bots[1].nextKeyAt = 0.5;
-  while (duel.phase !== "over" && duel.t < 300) {
-    if (duel.phase === "fight") bots.forEach((b) => b.update(duel.t));
-    duel.update(STEP);
-  }
-  return { won: duel.result ? duel.result.winner === 0 : Math.random() < 0.5, t: duel.t };
-}
-if (NW > 0) {
-  console.log(`\nWeapon pairs at equal skill (${NW} matches per pair, seats alternated; win% of the FIRST weapon; target 40 to 60%)`);
-  console.log("weapons: " + g.CONFIG.weapons.list.map((w0) => { const w = g.weaponFor(w0.id); return `${w.id} x${w.power} power, ${w.wordsPerCombo}/combo, ult at x${w.comboRequired}`; }).join("  |  "));
-  console.log("sim typing model (GUESSES): " + Object.entries(TYPING_MODEL).map(([k, v]) => `${k} x${v.speed} speed ${v.accuracy >= 0 ? "+" : ""}${(v.accuracy * 100).toFixed(1)} acc`).join(", "));
-  const pairs = [["light", "medium"], ["heavy", "medium"], ["light", "heavy"]];
-  console.log("skill            " + pairs.map(([a, b]) => `${a} vs ${b}`.padEnd(20)).join(""));
-  for (const [w, acc, note] of [[60, 0.96, ""], [80, 0.97, ""], [40, 0.95, "  (information only, see CLAUDE.md)"]]) {
-    const cells = pairs.map(([a, b]) => {
-      let won = 0;
-      for (let k = 0; k < NW; k++) { const first = k % 2 === 0; const r = weaponMatch(g, w, acc, first ? a : b, first ? b : a, (Math.random() * 1e9) | 0); if (r.won === first) won++; }
-      const pct = Math.round((100 * won) / NW);
-      return (pct + "%" + (pct < 40 || pct > 60 ? " !" : "")).padEnd(20);
-    });
-    console.log(`${w} wpm, ${Math.round(acc * 100)}% acc   ${cells.join("")}${note}`);
-  }
-}
-
 console.log(failed ? `\n${failed} check(s) failed` : "\nAll rule checks passed");
 process.exitCode = failed ? 1 : 0;

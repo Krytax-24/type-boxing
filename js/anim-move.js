@@ -216,6 +216,20 @@ const Move = (() => {
       this.startAction(c, 1);
       return true;
     }
+    // Play a list of attacks back to back (a random combo): each one starts as soon as the one before has
+    // landed its hit (its cancel window), so the combo flows like the lab's buffered chains.
+    playSeq(names, fx, speed) {
+      if (this.dead || !names || !names.length) return false;
+      const first = this.clips[names[0]];
+      if (!first) return false;
+      if (this.state !== "ground") return this.play(names[0], fx);
+      this.buffer = null;
+      this.queue = names.slice(1).filter((n) => this.clips[n]);
+      this.comboName = "random";
+      this.seqSpeed = speed || 1.15;
+      this.startAction(first, this.seqSpeed);
+      return true;
+    }
     startAction(c, speed) {
       this.turnT = -1; this.skidding = false;
       // Momentum: an attack out of a run or a dash keeps sliding forward and loses speed gradually.
@@ -563,8 +577,10 @@ const Move = (() => {
       a.prevU = uPrev;
       // Events fire after this frame's pose is set (effects read the pose).
       for (const [e, name] of c.events) if (e > uPrev && e <= a.u) this.pending.push([name, e]);
-      if (a.t >= c.dur) {
-        if (this.queue.length) { this.startAction(this.clips[this.queue.shift()], 1.2); }
+      if (this.comboName === "random" && this.queue.length && c.cancelAt !== undefined && a.u >= c.cancelAt + 0.04) {
+        this.startAction(this.clips[this.queue.shift()], this.seqSpeed || 1.15);
+      } else if (a.t >= c.dur) {
+        if (this.queue.length) { this.startAction(this.clips[this.queue.shift()], this.comboName === "random" ? this.seqSpeed || 1.15 : 1.2); }
         else if (c.next === null) { a.t = c.dur; }
         else { this.action = null; this.comboName = null; this.xfade(c.blendOut || 0.16); }
       }

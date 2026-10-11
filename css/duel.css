@@ -265,7 +265,7 @@ kbd {
 }
 .key b { color: var(--text); font-weight: 400; }
 
-/* Selectable cards: bots, swatches, weapons. Selected = magenta border on a raised panel. */
+/* Selectable cards: bots and fighters. Selected = magenta border on a raised panel. */
 .pick { border: var(--border); border-radius: var(--r); background: var(--surface); }
 .pick:hover { border-color: var(--dim); background: var(--raised); }
 .pick.sel { border-color: var(--magenta); background: var(--raised); box-shadow: inset 4px 0 0 var(--magenta); }
@@ -309,9 +309,6 @@ kbd {
 .group p { margin: 0 0 8px; font-size: var(--t12); line-height: 1.6; color: var(--dim); max-width: 60ch; }
 .group p b { color: var(--text); }
 .group.ult h3 { border-left-color: var(--gold); }
-.wtable { width: 100%; border-collapse: collapse; font-size: var(--t12); color: var(--dim); }
-.wtable td { padding: 4px 8px 4px 0; vertical-align: top; line-height: 1.5; }
-.wtable td:first-child { color: var(--text); font-weight: 700; white-space: nowrap; }
 
 /* Loadout: your fighter large on the left, the pickers on the right. */
 #scr-fighter { grid-template-columns: 448px 544px; gap: 16px; align-items: stretch; }
@@ -321,22 +318,12 @@ kbd {
 #fighter-name { font-size: var(--t24); font-weight: 700; letter-spacing: 4px; }
 #fighter-wname { font-size: var(--t16); font-weight: 700; letter-spacing: 2px; }
 #loadout-side { padding: 24px; display: grid; gap: 16px; align-content: start; }
-#swatches { display: grid; grid-template-columns: repeat(5, 48px); gap: 16px; padding: 4px 8px; }
-.swatch { position: relative; width: 48px; height: 48px; padding: 0; border-radius: var(--r); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--line); transition: transform 0.2s var(--ease); }
-.swatch:hover { transform: scale(1.06); }
-.swatch.sel { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--magenta); transform: scale(1.1); }
-.swatch.saved::after { content: ""; position: absolute; left: 50%; bottom: -12px; width: 4px; height: 4px; margin-left: -2px; background: var(--dim); }
-#fighter-namerow { display: flex; align-items: baseline; gap: 16px; padding-left: 8px; min-height: 24px; }
-#fighter-sample { font-size: var(--t24); font-weight: 700; }
-#fighter-sample .untyped { color: #c9d0ee; }
-#fighter-note { font-size: var(--t12); color: var(--dim); }
-#weapons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.weapon { position: relative; padding: 8px 12px; text-align: left; display: grid; gap: 4px; align-content: start; color: var(--dim); }
-.weapon .wname { font-size: var(--t12); letter-spacing: 1px; color: var(--dim); }
-.weapon .wname b { display: block; font-size: var(--t16); color: var(--text); letter-spacing: 1px; }
-.weapon .wline { font-size: var(--t12); line-height: 1.5; color: var(--dim); }
-.weapon .wsample { font-size: var(--t16); font-weight: 700; color: #c9d0ee; }
-.weapon.saved::after { content: ""; position: absolute; right: 8px; top: 8px; width: 4px; height: 4px; background: var(--dim); }
+#chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.char { position: relative; padding: 8px 12px; text-align: left; display: grid; gap: 2px; align-content: start; color: var(--dim); }
+.char b { font-size: var(--t12); letter-spacing: 1px; color: var(--text); }
+.char span { font-size: var(--t12); color: var(--dim); }
+.char.saved::after { content: ""; position: absolute; right: 8px; top: 8px; width: 4px; height: 4px; background: var(--dim); }
+#fighter-info { display: grid; gap: 4px; font-size: var(--t12); line-height: 1.5; color: var(--dim); padding-left: 8px; min-height: 40px; }
 #fighter-btns { justify-content: flex-end; margin-top: 8px; }
 
 /* Result screen */

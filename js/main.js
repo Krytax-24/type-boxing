@@ -148,10 +148,10 @@ const panels = [panelRefs($("hp1"), $("p1")), panelRefs($("hp2"), $("p2"))];
 for (const k in UI) document.documentElement.style.setProperty("--" + k, UI[k]);
 document.documentElement.style.setProperty("--font", CONFIG.theme.font);
 
-// Weapon name and one combo pip per clean word of that weapon's combo level.
-function setPanelWeapon(i, w) {
+// The fighter's name under the player's name, and one combo pip per clean word of a combo level.
+function setPanelChar(i, key, w) {
   const p = panels[i];
-  p.weaponEl.textContent = w.name.toUpperCase();
+  p.weaponEl.textContent = Chars.DEFS[key].name;
   p.pipBox.innerHTML = '<span class="pip"></span>'.repeat(w.wordsPerCombo);
   p.pips = [...p.pipBox.querySelectorAll(".pip")];
 }
@@ -176,6 +176,8 @@ function applySettings() {
   renderer.damageNumbers = settings.damageNumbers;
   duel.hitstopOn = !settings.reduceMotion; // visual only: hit-stop freezes poses, never rules
   ui.classList.toggle("reduce-motion", settings.reduceMotion);
+  Sfx.setEnabled(settings.sound);
+  Sfx.setVolume(settings.volume);
 }
 
 // ---------- View mode: "overhead" (words float over the fighters) or "classic" (typing box) ----------
@@ -267,58 +269,18 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("on"), 4000);
 }
 
-// ---------- Stickman color (cosmetic only; no rule reads it) ----------
-const COS = CONFIG.cosmetics;
-let colorIndex = Math.max(0, COS.colors.findIndex((c) => c.id === COS.defaultColor));
+// ---------- Fighters: the 11 designed 2D characters (cosmetic only; no rule reads them) ----------
+// Your fighter is saved in localStorage. Each bot plays as its own fighter (CONFIG.duel.bots[i].char), or the
+// next one in the roster when it is yours. Both typists keep one identity color (CONFIG.chars.you and .foe)
+// for the HUD, the word plate letters, the sparks and the glow around the fighter.
+const CH = CONFIG.chars;
+const ROSTER = Chars.ORDER;
+let charKey = CH.defaultChar;
 try {
-  const saved = COS.colors.findIndex((c) => c.id === localStorage.getItem(COS.storageKey));
-  if (saved >= 0) colorIndex = saved;
+  const saved = localStorage.getItem(CH.storageKey);
+  if (ROSTER.includes(saved)) charKey = saved;
 } catch (e) { /* storage blocked: keep the default */ }
-
-// Hue in degrees and saturation (0..1) of a #rrggbb color.
-function hueSat(hex) {
-  const n = parseInt(hex.slice(1), 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), d = max - Math.min(r, g, b);
-  let h = 0;
-  if (d) h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return { h: (h * 60 + 360) % 360, s: max ? d / max : 0 };
-}
-
-function tooClose(a, b) {
-  const A = hueSat(a), B = hueSat(b);
-  if (A.s < COS.minSaturation || B.s < COS.minSaturation) return false;
-  const gap = Math.abs(A.h - B.h);
-  return Math.min(gap, 360 - gap) < COS.minHueGap;
-}
-
-// The bot's look for a match: its usual colors, or the first backup far enough from yours.
-function botLookFor(you) {
-  const clash = (look) => [look.body, look.letters].some((c) => tooClose(c, you.body) || tooClose(c, you.letters));
-  return [COS.bot, ...COS.botBackups].find((look) => !clash(look)) || COS.botBackups[COS.botBackups.length - 1];
-}
-
-// ---------- Weapon (a rule input: it travels with the seed into Duel.start) ----------
-const WPN = CONFIG.weapons;
-const weapons = WPN.list.map((w) => weaponFor(w.id)); // every field filled in
-let weaponIndex = Math.max(0, weapons.findIndex((w) => w.id === WPN.defaultWeapon));
-try {
-  const saved = weapons.findIndex((w) => w.id === localStorage.getItem(WPN.storageKey));
-  if (saved >= 0) weaponIndex = saved;
-} catch (e) { /* storage blocked: keep the default */ }
-
-// One line of numbers for the Fighter screen and How to play, built from CONFIG.
-function weaponLine(w) {
-  const bonus = w.comboBonus !== CONFIG.duel.comboBonus ? `, +${Math.round(w.comboBonus * 100)}% per combo` : "";
-  return `x${+w.power.toFixed(3)} power${bonus}, ${w.wordsPerCombo} clean words per combo, ultimate after ${w.wordsPerCombo * w.comboRequired}, ${w.words}`;
-}
-
-// A sample word from the weapon's pool (fixed seed, so it does not flicker).
-function weaponSample(w) {
-  const src = new WordSource(31, WORD_POOLS[w.pool], ULT_POOLS[w.ultPool]);
-  let word = src.next();
-  for (let k = 0; k < 6 && w.id === "heavy" && word.length < 9; k++) word = src.next();
-  return word;
-}
+const charDef = (k) => Chars.DEFS[k];
 
 // ---------- Bots: the six levels plus MATCH ME (CONFIG.duel.bots and CONFIG.duel.matchMe) ----------
 const MM = CONFIG.duel.matchMe;
@@ -347,25 +309,27 @@ function botCfgFor(i) {
   const t = matchTarget();
   return Object.assign({}, b, { wpm: Bot.rawWpmFor(t, b), beatAt: t });
 }
-function botWeaponId(cfg) { return cfg.weapon || WPN.botWeapon; }
+// The fighter bot i plays as against your fighter.
+function botCharFor(i) { return DuelChars.botKey(BOTS[i].char, charKey); }
 
-// Colors and weapon looks on the fighters (cosmetic fields only) and on every piece of HUD that belongs to a player.
+// Identity colors on the fighters (cosmetic fields only), the 2D fighters for the renderer, and every piece
+// of HUD that belongs to a player.
 function applyLooks() {
-  const you = COS.colors[colorIndex], foe = botLookFor(you);
+  const you = CH.you, foe = CH.foe;
   const [a, b] = duel.fighters;
   a.color = you.body; a.letterColor = you.letters; a.sparkColor = you.body;
-  b.color = foe.body; b.letterColor = foe.letters; // the bot's sparks keep their default
-  a.weaponLook = duel.typists[0].weapon.id;
-  b.weaponLook = duel.typists[1].weapon.id;
+  b.color = foe.body; b.letterColor = foe.letters;
   const root = document.documentElement.style;
   root.setProperty("--you", you.body);
   root.setProperty("--you-letters", you.letters);
   root.setProperty("--foe", foe.body);
-  renderer.menuSpar = [you.body, foe.body, weapons[weaponIndex].id, botWeaponId(botCfgFor(botIndex))];
+  const keys = [charKey, botCharFor(botIndex)];
+  renderer.chars = { keys, glows: [you.body, foe.body] };
+  renderer.menuSpar = keys;
   // Top bar: your fighter.
-  const w = weapons[weaponIndex];
-  document.querySelector(".chip-color").textContent = you.name;
-  document.querySelector(".chip-weapon").innerHTML = `<b>${w.name.toUpperCase()}</b> ${w.tier.toLowerCase()}`;
+  const d = charDef(charKey);
+  document.querySelector(".chip-color").textContent = d.name;
+  document.querySelector(".chip-weapon").textContent = d.title.toLowerCase();
 }
 
 // ---------- Screens and modals ----------
@@ -375,9 +339,8 @@ function applyLooks() {
 let screen = "title";
 let back = "title";
 let modals = [];
-let pickIndex = 0;       // swatch under the cursor on the Fighter screen
-let pickWeapon = 0;      // weapon under the cursor on the Fighter screen
-let pickRow = 0;         // 0: color row, 1: weapon row
+let pickIndex = 0;       // fighter under the cursor on the Fighter screen
+const PICK_COLS = 3;     // fighters per row on the Fighter screen (Up and Down move a row)
 let setTab = 0;          // settings tab
 let setRow = 0;          // focused settings row
 
@@ -413,9 +376,9 @@ function keyline(items) { $("keyline").innerHTML = items.join(""); }
 const botKeys = () => `1 to ${BOTS.length}`;
 
 function botCard(b, i) {
-  const cfg = botCfgFor(i), w = weaponFor(botWeaponId(cfg));
+  const cfg = botCfgFor(i), d = charDef(botCharFor(i));
   return `<button class="bot-opt pick ${b.match ? "match" : ""} ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1">` +
-    `${kb(i + 1)}<span><span class="bname">${b.name}<i>${w.name}</i></span><span class="bstyle">${b.style}</span></span>` +
+    `${kb(i + 1)}<span><span class="bname">${b.name}<i>${d.name}</i></span><span class="bstyle">${b.style}</span></span>` +
     `<span class="beat">beat it at about<b>${Math.round(cfg.beatAt)} wpm</b></span></button>`;
 }
 
@@ -424,7 +387,7 @@ function renderTitle() {
   const cfg = botCfgFor(botIndex);
   $("title-menu").innerHTML =
     mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, about ${Math.round(cfg.beatAt)} wpm`) +
-    mbtn("history", "Match History", "H") + mbtn("fighter", "Fighter", "C") + mbtn("howto", "How to play", "L") + mbtn("settings", "Settings", "S");
+    mbtn("fighter", "Fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("settings", "Settings", "S");
   $("title-bots").innerHTML = `<div class="card-label"><span>Opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
   keyline([keyBtn("nextbot", botKeys(), "bot"), keyBtn("view", "F2", "view: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
   applyLooks();
@@ -433,24 +396,24 @@ function renderTitle() {
 // How to play, built from CONFIG so the numbers always match the rules.
 function renderHowto() {
   showScreen("howto");
-  const D = CONFIG.duel, U = D.ultimate, w = weapons[weaponIndex];
+  const D = CONFIG.duel, U = D.ultimate, w = weaponFor("medium");
   $("scr-howto").innerHTML = `
     <h2 class="screen-title">How to play</h2>
     <div class="group"><h3>Basics</h3>
       <p>Type the words. <b>Space</b> ends a word, <b>Backspace</b> fixes a letter.</p>
-      <p><b>Power</b> is your wpm times your weapon. It is your attack and your guard.</p>
+      <p><b>Power</b> is your wpm, plus your combo bonus. It is your attack and your guard.</p>
       <p>The faster typist hits for the difference; the blocked part heals you both (max ${D.maxHp} HP). <b>Edge</b>, at the top, shows the swing in HP per second.</p>
     </div>
     <div class="group"><h3>Combos and counter</h3>
-      <p>${w.wordsPerCombo} clean words in a row (${w.name}) fill the pips: <b>+1 combo</b>, +${Math.round(w.comboBonus * 100)}% power. One wrong key breaks it.</p>
+      <p>${w.wordsPerCombo} clean words in a row fill the pips: <b>+1 combo</b>, +${Math.round(w.comboBonus * 100)}% power. One wrong key breaks it.</p>
       <p>Break your combo and the other typist gets a <b>counter</b>: +${Math.round(D.counter.powerBonus * 100)}% power for ${D.counter.duration} s. Break theirs and it is yours.</p>
     </div>
     <div class="group ult"><h3>Ultimate</h3>
       <p>Full gold bar and combo x${w.comboRequired}: a <b>gold word</b> appears. Type it clean for ${U.damage} damage and a ${U.stun} s stun. A sloppy one deals ${U.sloppyDamage}.</p>
       <p>Your word floats over your fighter, the bot's over the bot, so you see its attacks coming. <b>Esc</b> pauses.</p>
     </div>
-    <div class="group"><h3>Weapons</h3>
-      <table class="wtable">${weapons.map((x) => `<tr><td>${x.name}</td><td>${weaponLine(x)}</td></tr>`).join("")}</table>
+    <div class="group"><h3>Fighters</h3>
+      <p>Every word is a strike from your fighter's own random combo; a long word swings harder, a new combo level ends on a knockdown. Fighters only change the look and the moves: the numbers are the same for all, so the bot's speed is the only difficulty.</p>
     </div>
     <div class="btn-row">${btn("back", "Back", "Esc")}${btn("fighter", "Fighter", "C")}${btn("play", "Fight", "Enter", "primary")}</div>`;
   keyline([]);
@@ -461,10 +424,9 @@ function begin() {
   modals = [];
   renderModal();
   botCfg = botCfgFor(botIndex);
-  // The weapon ids are rule inputs; online they will travel with the seed.
-  duel.start((Math.random() * 1e9) | 0, [weapons[weaponIndex].id, botWeaponId(botCfg)]);
-  setPanelWeapon(0, duel.typists[0].weapon);
-  setPanelWeapon(1, duel.typists[1].weapon);
+  duel.start((Math.random() * 1e9) | 0);
+  setPanelChar(0, charKey, duel.typists[0].weapon);
+  setPanelChar(1, botCharFor(botIndex), duel.typists[1].weapon);
   panels[1].name.textContent = botCfg.name;
   applyLooks(); // cosmetic; online, the color will travel with the seed
   bot = new Bot(botCfg, duel.streams[1], (events, t) => duel.handleEvents(1, events, t));
@@ -488,37 +450,9 @@ function avgWpm(t) {
   const s = t.stats, secs = Math.max(s.lastKeyAt - (s.firstKeyAt || 0), 1);
   return Math.round(s.correct / 5 / (secs / 60));
 }
-function accuracyPct(t) {
-  const s = t.stats, n = s.correct + s.wrong;
-  return n ? Math.round((s.correct / n) * 100) : 0;
-}
 function accuracy(t) {
-  const n = t.stats.correct + t.stats.wrong;
-  return n ? accuracyPct(t) + "%" : "-";
-}
-function resultRecFor(t, name) {
-  return {
-    name,
-    weapon: t.weapon.id,
-    wpm: avgWpm(t),
-    accuracy: accuracyPct(t),
-    bestCombo: t.stats.bestCombo,
-    ultimates: t.stats.ultimates,
-    correct: t.stats.correct,
-    wrong: t.stats.wrong,
-    words: t.stats.words,
-  };
-}
-function saveMatchResult(youWon) {
-  if (typeof MatchHistory === "undefined") return false;
-  return MatchHistory.add({
-    won: youWon,
-    seconds: +duel.t.toFixed(1),
-    bot: botCfg.name,
-    botBeatAt: Math.round(botCfg.beatAt),
-    you: resultRecFor(duel.typists[0], "YOU"),
-    foe: resultRecFor(duel.typists[1], botCfg.name),
-  });
+  const s = t.stats, n = s.correct + s.wrong;
+  return n ? Math.round((s.correct / n) * 100) + "%" : "-";
 }
 
 // A small WPM-over-time line for both players (SVG, drawn from wpmTrace).
@@ -543,9 +477,9 @@ function wpmChart() {
 function showResult() {
   showScreen("result");
   const youWon = duel.result.winner === 0;
-  saveMatchResult(youWon);
   $("ko-title").className = youWon ? "win" : "lose";
   $("ko-title").textContent = youWon ? "YOU WIN" : "YOU LOSE";
+  Sfx.play(youWon ? "win" : "lose");
   $("ko-sub").textContent = `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (beat it at about ${Math.round(botCfg.beatAt)} wpm)`;
   const col = (t, i, name) => `<div class="rcol panel" style="--id:var(${i ? "--foe" : "--you"})"><h3>${name}</h3><dl>
     <dt>Average WPM</dt><dd>${avgWpm(t)}</dd><dt>Accuracy</dt><dd>${accuracy(t)}</dd>
@@ -563,7 +497,7 @@ function resultBots() {
     keyBtn("view", "F2", "view: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
 }
 
-// ---------- Fighter screen (loadout): pick your stickman's color and weapon ----------
+// ---------- Fighter screen: pick one of the 11 fighters ----------
 function sizePreview() {
   const cv = $("fighter-preview"), dpr = Math.min(window.devicePixelRatio || 1, 3);
   cv.width = Math.round(446 * uiScale * dpr);
@@ -572,50 +506,37 @@ function sizePreview() {
 
 function openFighter() {
   back = screen === "result" ? "result" : "title";
-  pickIndex = colorIndex;
-  pickWeapon = weaponIndex;
-  pickRow = 0;
+  pickIndex = Math.max(0, ROSTER.indexOf(charKey));
   showScreen("fighter");
-  $("swatches").innerHTML = COS.colors.map((c, i) => `<button class="swatch" data-act="color:${i}" tabindex="-1" title="${c.name}" aria-label="${c.name}" style="background:${c.body}"></button>`).join("");
-  $("weapons").innerHTML = weapons.map((w, i) => `<button class="weapon pick" data-act="weapon:${i}" tabindex="-1"><span class="wname"><b>${w.name.toUpperCase()}</b>${w.tier}</span>` +
-    `<span class="wline">${weaponLine(w)}</span><span class="wsample">${weaponSample(w)}</span></button>`).join("");
+  $("chars").innerHTML = ROSTER.map((k, i) => { const d = charDef(k); return `<button class="char pick" data-act="char:${i}" tabindex="-1"><b>${d.name}</b><span>${d.title}</span></button>`; }).join("");
   $("fighter-btns").innerHTML = btn("back", "Back", "Esc") + btn("confirm", "Confirm", "Enter", "primary");
-  keyline([keyBtn("row", "Up / Down", "color or weapon"), keyBtn("prev", "Left", "previous"), keyBtn("next", "Right", "next")]);
+  keyline([keyBtn("prev", "Left", "previous"), keyBtn("next", "Right", "next"), keyBtn("down", "Up / Down", "row")]);
   sizePreview();
   renderFighter();
 }
 
 function renderFighter() {
-  const c = COS.colors[pickIndex], foe = botLookFor(c), w = weapons[pickWeapon];
-  [...document.querySelectorAll(".swatch")].forEach((el, i) => {
+  const k = ROSTER[pickIndex], d = charDef(k), w = Anim.W[d.weapon];
+  [...document.querySelectorAll(".char")].forEach((el, i) => {
     el.classList.toggle("sel", i === pickIndex);
-    el.classList.toggle("saved", i === colorIndex);
+    el.classList.toggle("saved", ROSTER[i] === charKey);
   });
-  $("fighter-name").textContent = c.name;
-  $("fighter-name").style.color = c.body;
-  $("fighter-wname").textContent = w.name.toUpperCase();
-  $("fighter-sample").innerHTML = `<span style="color:${c.letters}">fig</span><span class="untyped">ht</span>`;
-  $("fighter-note").textContent = foe === COS.bot ? "" : `Too close to the bot: it fights in ${foe.name.toLowerCase()} instead.`;
-  [...document.querySelectorAll(".weapon")].forEach((el, i) => {
-    el.classList.toggle("sel", i === pickWeapon);
-    el.classList.toggle("saved", i === weaponIndex);
-  });
-  $("label-color").classList.toggle("active", pickRow === 0);
-  $("label-weapon").classList.toggle("active", pickRow === 1);
+  $("fighter-name").textContent = d.name;
+  $("fighter-wname").textContent = d.title.toUpperCase();
+  const vs = BOTS.filter((b) => b.char === k).map((b) => b.name);
+  $("fighter-info").innerHTML = `<span>Moves: ${w.name.toLowerCase()} set, random combos every match.</span>` +
+    (vs.length ? `<span>${vs.join(", ")} will fight as someone else, since this is their fighter.</span>` : "");
 }
 
 function stepPick(step) {
-  if (pickRow === 0) pickIndex = (pickIndex + step + COS.colors.length) % COS.colors.length;
-  else pickWeapon = (pickWeapon + step + weapons.length) % weapons.length;
+  pickIndex = (pickIndex + step + ROSTER.length) % ROSTER.length;
   renderFighter();
 }
 
 function closeFighter(confirm) {
   if (confirm) {
-    colorIndex = pickIndex;
-    try { localStorage.setItem(COS.storageKey, COS.colors[colorIndex].id); } catch (e) { /* not saved, still works */ }
-    weaponIndex = pickWeapon;
-    try { localStorage.setItem(WPN.storageKey, weapons[weaponIndex].id); } catch (e) { /* not saved, still works */ }
+    charKey = ROSTER[pickIndex];
+    try { localStorage.setItem(CH.storageKey, charKey); } catch (e) { /* not saved, still works */ }
     applyLooks();
   }
   if (back === "result") { showScreen("result"); resultBots(); } else renderTitle();
@@ -677,6 +598,12 @@ const SETTINGS_TABS = [
     { id: "fullscreen", label: "Fullscreen", hint: "Also F on the menus and the button in the top bar.",
       opts: [[false, "Off"], [true, "On"]], get: () => isFullscreen(), set: (v) => setFullscreen(v) },
   ] },
+  { name: "Audio", rows: [
+    { id: "sound", label: "Sound effects", hint: "Hits, typing clicks, combos, the countdown and the K.O.",
+      opts: [[true, "On"], [false, "Off"]], get: () => settings.sound, set: (v) => { settings.sound = v; } },
+    { id: "volume", label: "Volume", hint: "How loud the sound effects play.",
+      opts: SET.volumeSteps, get: () => settings.volume, set: (v) => { settings.volume = v; Sfx.unlock(); } },
+  ] },
   { name: "Controls", rows: [] },
 ];
 const KEY_ROWS = [
@@ -685,8 +612,8 @@ const KEY_ROWS = [
   ["Pause menu", "<kbd>Esc</kbd> resume, <kbd>R</kbd> restart, <kbd>S</kbd> settings, <kbd>Q</kbd> quit"],
   ["Title and result", "<kbd>Enter</kbd> fight, <kbd>1</kbd> to <kbd>7</kbd> bot, <kbd>C</kbd> fighter, <kbd>H</kbd> how to play"],
   ["", "<kbd>S</kbd> settings, <kbd>F2</kbd> view, <kbd>F</kbd> fullscreen, <kbd>Esc</kbd> menu (result)"],
-  ["Fighter", "<kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> pick, <kbd>Enter</kbd> confirm, <kbd>Esc</kbd> back"],
-  ["Settings", "<kbd>1</kbd> to <kbd>3</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
+  ["Fighter", "<kbd>Left</kbd> <kbd>Right</kbd> pick, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Enter</kbd> confirm, <kbd>Esc</kbd> back"],
+  ["Settings", "<kbd>1</kbd> to <kbd>4</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
   ["Mouse", "Click any button or key chip. Typing stays on the keyboard."],
 ];
 
@@ -735,6 +662,7 @@ function setTabTo(i) { setTab = (i + SETTINGS_TABS.length) % SETTINGS_TABS.lengt
 // ---------- Actions: the one place the keyboard and the mouse both go through ----------
 function act(name) {
   const [a, x, y] = name.split(":");
+  Sfx.play("ui");
   const top = topModal();
   switch (a) {
     case "play": case "rematch": begin(); break;
@@ -752,11 +680,11 @@ function act(name) {
       else if (screen === "fighter") closeFighter(false);
       break;
     case "confirm": closeFighter(true); break;
-    case "row": pickRow = 1 - pickRow; renderFighter(); break;
     case "prev": stepPick(-1); break;
     case "next": stepPick(1); break;
-    case "color": pickIndex = +x; pickRow = 0; renderFighter(); break;
-    case "weapon": pickWeapon = +x; pickRow = 1; renderFighter(); break;
+    case "up": stepPick(-PICK_COLS); break;
+    case "down": stepPick(PICK_COLS); break;
+    case "char": pickIndex = +x; renderFighter(); break;
     case "pause": openPause(); break;
     case "resume": modals = []; renderModal(); break;
     case "restart": begin(); break;
@@ -771,6 +699,7 @@ function act(name) {
 // Mouse: a click never takes focus (so it can never steal the typing) and never types a character.
 document.addEventListener("mousedown", (e) => { if (e.target.closest("button")) e.preventDefault(); });
 ui.addEventListener("click", (e) => {
+  Sfx.unlock();
   const b = e.target.closest("[data-act]");
   if (!b) return;
   if (duel.phase === "over" && !shownResult) return; // K.O. is playing out
@@ -783,7 +712,7 @@ ui.addEventListener("click", (e) => {
 function menuKey(e) {
   const k = e.key, lower = k.length === 1 ? k.toLowerCase() : k;
   if (screen === "fighter") {
-    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); pickRow = k === "ArrowUp" ? 0 : 1; renderFighter(); }
+    if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); act(k === "ArrowUp" ? "up" : "down"); }
     else if (k === "ArrowLeft") { e.preventDefault(); act("prev"); }
     else if (k === "ArrowRight") { e.preventDefault(); act("next"); }
     else if (k === "Enter") act("confirm");
@@ -834,6 +763,7 @@ function modalKey(top, e) {
 }
 
 window.addEventListener("keydown", (e) => {
+  Sfx.unlock(); // browsers allow audio only after a key or a click
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const top = topModal();
   if (top) { modalKey(top, e); return; }
@@ -850,7 +780,11 @@ window.addEventListener("keydown", (e) => {
 
   if (e.key === "Backspace") { duel.streams[0].backspace(); view.update(); return; }
   if (e.key.length === 1) {
-    duel.handleEvents(0, duel.streams[0].press(e.key.toLowerCase()), duel.t);
+    const evs = duel.streams[0].press(e.key.toLowerCase());
+    duel.handleEvents(0, evs, duel.t);
+    // Typing sounds: a soft click per right key, a dull knock per typo (the word strikes sound from the fighters).
+    if (evs.some((v) => v.type === "wrong")) Sfx.play("typo");
+    else if (evs.some((v) => v.type === "correct" || v.type === "word")) Sfx.play("key");
     view.update();
   }
 });
@@ -882,6 +816,7 @@ function updateHud(dt) {
     p.combo.textContent = "x" + t.comboLevel;
     if (t.comboLevel !== p.lastCombo) {
       const cls = t.comboLevel > p.lastCombo ? "pop" : "broke";
+      if (duel.phase === "fight") Sfx.play(cls === "pop" ? "combo" : "broken", t.comboLevel);
       p.comboBox.classList.remove("pop", "broke"); void p.comboBox.offsetWidth; p.comboBox.classList.add(cls);
     }
     p.lastCombo = t.comboLevel;
@@ -925,10 +860,31 @@ function updateHud(dt) {
     fillW.classList.toggle("ult", !!w.ultimate);
   }
 
+  fightSounds();
   const cd = $("countdown");
   if (duel.phase === "countdown") cd.textContent = Math.ceil(duel.countdown);
   else if (duel.goFlash > 0) cd.textContent = "FIGHT!";
   else cd.textContent = "";
+}
+
+// Moments that sound once, found by watching the duel's state change (never by changing it).
+const heard = { beat: 0, phase: "menu", counter: [false, false], ready: [false, false], ult: [null, null] };
+function fightSounds() {
+  if (duel.phase === "countdown") {
+    const b = Math.ceil(duel.countdown);
+    if (b !== heard.beat) { heard.beat = b; Sfx.play("beep"); }
+  } else heard.beat = 0;
+  if (duel.phase === "fight" && heard.phase === "countdown") Sfx.play("go");
+  if (duel.phase === "over" && heard.phase === "fight") Sfx.play("ko");
+  heard.phase = duel.phase;
+  if (duel.phase !== "fight") { heard.counter = [false, false]; heard.ready = [false, false]; return; }
+  duel.typists.forEach((t, i) => {
+    const c = t.countering(duel.t), r = t.ultReady(), u = duel.fighters[i].ult || null;
+    if (c && !heard.counter[i]) Sfx.play("counter");
+    if (r && !heard.ready[i] && i === 0) Sfx.play("ultReady");
+    if (u && u !== heard.ult[i]) Sfx.play("ultimate");
+    heard.counter[i] = c; heard.ready[i] = r; heard.ult[i] = u;
+  });
 }
 
 // ---------- The loop ----------
@@ -965,14 +921,13 @@ function loop(now) {
   }
   if (duel.phase !== "over") shownResult = false;
   renderer.draw(duel, frozen ? 0 : dt);
-  if (screen === "fighter") renderer.drawPreview($("fighter-preview"), COS.colors[pickIndex].body, weapons[pickWeapon].id);
+  if (screen === "fighter") DuelChars.drawPreview($("fighter-preview"), ROSTER[pickIndex], frozen ? 0 : dt, settings.reduceMotion);
   updateHud(dt);
   frameStats.n++; frameStats.ms += performance.now() - t0;
   requestAnimationFrame(loop);
 }
 
 applySettings();
-duel.typists[0].weapon = weapons[weaponIndex]; // so the title and the top bar show your weapon
 renderTitle();
 applyView();
 requestAnimationFrame(loop);

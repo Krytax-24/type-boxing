@@ -158,8 +158,10 @@ const T3A = (() => {
     const keys = [K(0, {}, "inout"), K(0.12 * k, W, "in"), K(0.3 * k, M(arm, { yaw: 300, x: 0.12 }, F(st, 0.12, 0.12)), "linear"),
       K(0.48 * k, M(arm, { yaw: 600, x: 0.22 }, F(st, 0.22, 0.22)), "out"), K(0.62 * k, M(arm, { yaw: 720, x: 0.26 }, F(st, 0.26, 0.26)), "inout"),
       K(0.84 * k, M({ yaw: 720, x: 0.26 }, F(st, 0.26, 0.26)), "inout")];
-    const hits = [{ at: 0.13 * k, until: 0.22 * k, point: "wpn", r: 0.24, dmg: 12, level: "M", react: "heavy", push: 0.9 },
-      { at: 0.33 * k, until: 0.44 * k, point: "wpn", r: 0.24, dmg: 14, level: "M", react: "stagger", push: 1.4 }];
+    // The hit windows follow the sweep: the spin eases in, so the blade crosses the front at about 0.23 (first
+    // turn) and 0.42 (second turn). (Windows that closed before the first crossing missed airborne bodies.)
+    const hits = [{ at: 0.15 * k, until: 0.27 * k, point: "wpn", r: 0.24, dmg: 12, level: "M", react: "heavy", push: 0.9 },
+      { at: 0.34 * k, until: 0.47 * k, point: "wpn", r: 0.24, dmg: 14, level: "M", react: "stagger", push: 1.4 }];
     if (o.hit) for (const h of hits) Object.assign(h, o.hit);
     return { keys, hits, dur: 0.84 * k };
   };
@@ -306,7 +308,8 @@ const T3A = (() => {
       if (s.events) for (const e of s.events) events.push(e);
     }
     keys.push(K(o.dur, o.endPose || {}, "inout"));
-    return { keys, hits, events, dur: o.dur, super: true, cine: o.cine || { dur: o.dur - 0.3 }, noAssist: true, track: 20 };
+    // The opener stretches up to 0.22 m to meet an opponent just out of reach (reach assist), like every other strike.
+    return { keys, hits, events, dur: o.dur, super: true, cine: o.cine || { dur: o.dur - 0.3 }, track: 20 };
   };
 
   return { strike, F, M, K, mk, W2, backhand, diagDown, diagUp, flurry, whirl, vaultKick, spinLow, jumpChop, homeRun, cast, blink, superMove, jab, cross, hook, body, uppercut, lowPunch, snapKick, roundhouse, lowKick, sweep, knee, pushKick, jumpKick, thrust, hSlash, overhead, lowSlash, rising, spin, lungeThrust, buttJab };
