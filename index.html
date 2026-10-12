@@ -69,13 +69,15 @@
 
       <section id="scr-howto" class="screen panel"></section>
 
+      <section id="scr-stats" class="screen panel"></section>
+
       <section id="scr-fighter" class="screen">
         <div id="loadout-stage" class="panel">
           <canvas id="fighter-preview"></canvas>
           <div id="loadout-tag"><span id="fighter-name"></span><span id="fighter-wname"></span></div>
         </div>
         <div id="loadout-side" class="panel">
-          <h2 class="screen-title">Fighter</h2>
+          <h2 class="screen-title">Choose your fighter</h2>
           <div class="row-label active" id="label-char">Pick your fighter</div>
           <div id="chars"></div>
           <div id="fighter-info"></div>
@@ -90,6 +92,7 @@
         </div>
         <div id="result-cols"></div>
         <div id="wpm-chart" class="panel"></div>
+        <div id="result-extra" class="panel"></div>
         <div id="result-bots" class="panel"></div>
         <div class="btn-row" id="result-btns"></div>
       </section>
@@ -105,9 +108,11 @@
     </div>
 
     <div id="toast" role="status" aria-live="polite"></div>
+    <div id="perf" class="hidden" aria-hidden="true"></div>
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/themes.js"></script>
   <script src="js/words.js"></script>
   <script src="js/duel-typing.js"></script>
   <script src="js/fighter.js"></script>
@@ -120,6 +125,8 @@
   <script src="js/sfx.js"></script>
   <script src="js/render.js"></script>
   <script src="js/duel.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/stats-page.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

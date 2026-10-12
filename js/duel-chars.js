@@ -20,6 +20,10 @@ const DuelChars = (() => {
   const hitSound = (def) => DRAW_SOUND[def.weaponDraw] || "punch";
   const defOf = (key) => Chars.DEFS[key] || Chars.DEFS[Chars.ORDER[0]];
 
+  // Effect switches from the Graphics tab (visual only; set by main.js with setFx). Every one defaults to on.
+  const FXO = { sparks: true, smears: true, afterimages: true, dust: true, glow: true, budget: 400 };
+  function setFx(o) { Object.assign(FXO, o); }
+
   // ---------- One fighter ----------
   class Puppet {
     constructor(key, x, facing, seed) {
@@ -96,6 +100,7 @@ const DuelChars = (() => {
 
     // ----- effects -----
     sparks(x, y, n, color, size) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) {
         const a = rnd(0, Math.PI * 2);
         this.parts.push({ k: "spark", x, y, a, sp: rnd(160, 520) * (size || 1), len: rnd(8, 20) * (size || 1), life: rnd(0.16, 0.3), age: 0, color });
@@ -103,19 +108,22 @@ const DuelChars = (() => {
       this.parts.push({ k: "flash", x, y, r: 22 * (size || 1), life: 0.1, age: 0 });
     }
     dust(x, n, spread, dir, size) {
+      if (!FXO.dust) return;
       for (let i = 0; i < n; i++) this.parts.push({ k: "dust", x: x + rnd(-spread, spread) * 0.3, y: -rnd(0, 6), vx: dir * rnd(20, 90) + rnd(-spread, spread), vy: -rnd(10, 50), r: rnd(3, 7) * (size || 1), vr: rnd(10, 26), life: rnd(0.35, 0.6), age: 0 });
     }
-    ring(x, w, life) { this.parts.push({ k: "ring", x, y: 0, w, life: life || 0.45, age: 0 }); }
+    ring(x, w, life) { if (FXO.dust) this.parts.push({ k: "ring", x, y: 0, w, life: life || 0.45, age: 0 }); }
     fire(x, y, n, dir, size) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) this.parts.push({ k: "fire", x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: dir * rnd(80, 260) + rnd(-40, 40), vy: -rnd(30, 140), r: rnd(5, 11) * (size || 1), life: rnd(0.25, 0.5), age: 0 });
     }
     ice(x, y, n) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) { const a = rnd(Math.PI * 1.05, Math.PI * 1.95); this.parts.push({ k: "ice", x, y, vx: Math.cos(a) * rnd(60, 260), vy: Math.sin(a) * rnd(60, 260), r: rnd(2, 5), rot: rnd(0, 6), life: rnd(0.4, 0.8), age: 0 }); }
     }
-    star(x, y) { this.parts.push({ k: "star", x, y, life: 0.3, age: 0 }); this.sparks(x, y, 8, "255, 245, 210", 0.7); }
+    star(x, y) { if (!FXO.sparks) return; this.parts.push({ k: "star", x, y, life: 0.3, age: 0 }); this.sparks(x, y, 8, "255, 245, 210", 0.7); }
     muzzle(p) {
       const h = p.S.J.fh, x = h[0] + p.ch.facing * 26, y = h[1] - 4;
-      this.parts.push({ k: "flash", x, y, r: 16, life: 0.07, age: 0 });
+      if (FXO.sparks) this.parts.push({ k: "flash", x, y, r: 16, life: 0.07, age: 0 });
       this.sparks(x, y, 4, "255, 214, 90", 0.5);
     }
 
@@ -210,14 +218,14 @@ const DuelChars = (() => {
         const vel = (ch.x - prevX) / dt;
         if (!p.clothReady) { Chars.resetCloth(p.cloth, S); p.clothReady = true; for (let k = 0; k < 60; k++) Chars.stepCloth(p.cloth, S, 1 / 120, 0, k / 120, 0); }
         Chars.stepCloth(p.cloth, S, dt, 0, this.time, vel);
-        if (p.def.weaponDraw === "axe" && Math.random() < 0.2) { const q = Rig.trailPoints(S, "axe")[0][0]; this.parts.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.2), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
+        if (FXO.sparks && p.def.weaponDraw === "axe" && Math.random() < 0.2) { const q = Rig.trailPoints(S, "axe")[0][0]; this.parts.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.2), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
         this.trailStep(p, dt, prevClip, prevU);
         // Afterimages during the ultimate and a dash.
         for (const g of p.ghosts) g.life -= dt * 4.2;
         p.ghosts = p.ghosts.filter((g) => g.life > 0);
         p.ghostT -= dt;
         const gw = ch.action && ch.action.c.ghosts;
-        if ((p.ult && ch.action) || (gw && ch.action.u >= gw[0] && ch.action.u <= gw[1])) {
+        if (FXO.afterimages && ((p.ult && ch.action) || (gw && ch.action.u >= gw[0] && ch.action.u <= gw[1]))) {
           if (p.ghostT <= 0) { p.ghostT = 0.035; p.ghosts.push({ S, life: 1 }); }
         }
       }
@@ -264,7 +272,7 @@ const DuelChars = (() => {
         if (q.k === "ice") { q.x += q.vx * edt; q.y += q.vy * edt; q.vy += 600 * edt; q.rot += 8 * edt; if (q.y > 0) { q.y = 0; q.vy *= -0.3; q.vx *= 0.6; } }
       }
       this.parts = this.parts.filter((q) => q.age < q.life);
-      if (this.parts.length > 400) this.parts.splice(0, this.parts.length - 400);
+      if (this.parts.length > FXO.budget) this.parts.splice(0, this.parts.length - FXO.budget);
       this.shake = Math.max(0, this.shake - dt * 24);
     }
 
@@ -273,7 +281,8 @@ const DuelChars = (() => {
       opt = opt || {};
       const shadow = opt.shadow || "rgba(0, 0, 0, 0.45)";
       ctx.save();
-      if (this.shake && !opt.noShake) ctx.translate(rnd(-1, 1) * this.shake, rnd(-1, 1) * this.shake * 0.6);
+      const sk = this.shake * (opt.shakeScale === undefined ? 1 : opt.shakeScale); // the player's shake intensity
+      if (sk && !opt.noShake) ctx.translate(rnd(-1, 1) * sk, rnd(-1, 1) * sk * 0.6);
       // The attacker is drawn last, so its strike reads in front.
       const order = this.p.slice().sort((a, b) => (a.ch.action && !a.ch.action.c.react ? 1 : 0) - (b.ch.action && !b.ch.action.c.react ? 1 : 0));
       for (const p of order) {
@@ -287,8 +296,8 @@ const DuelChars = (() => {
         ctx.globalAlpha = 1;
         ctx.save();
         ctx.translate(0, -z);
-        for (const g of p.ghosts) Chars.draw(ctx, g.S, p.def, [], { ghost: `rgba(${p.ult ? "255, 197, 61" : p.trail}, 1)`, alpha: g.life * 0.22 });
-        if (p.glow && !opt.noGlow) {
+        if (FXO.afterimages) for (const g of p.ghosts) Chars.draw(ctx, g.S, p.def, [], { ghost: `rgba(${p.ult ? "255, 197, 61" : p.trail}, 1)`, alpha: g.life * 0.22 });
+        if (p.glow && !opt.noGlow && FXO.glow) {
           // Identity glow: a soft halo in the typist's color, so both read on the dark arena.
           ctx.save();
           ctx.shadowColor = `rgba(${p.glow}, 0.6)`;
@@ -299,7 +308,7 @@ const DuelChars = (() => {
         Chars.draw(ctx, S, p.def, p.cloth, { t: this.time, heat: p.heat, flash: p.flash > 0 });
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        for (const h2 of p.trails) Rig.drawTrail(ctx, h2, `rgba(${p.trail}, 1)`);
+        if (FXO.smears) for (const h2 of p.trails) Rig.drawTrail(ctx, h2, `rgba(${p.trail}, 1)`);
         ctx.restore();
         ctx.restore();
       }
@@ -377,7 +386,7 @@ const DuelChars = (() => {
           if (ch.action && !ch.dead) ch.action = null;
           ch.playSeq(Combo2D.ultimate(p.def.weapon, p.seed + p.mc), null, 1.3);
           p.ult = true;
-          duelStage.parts.push({ k: "flash", x: ch.x, y: -90, r: 70, life: 0.25, age: 0 });
+          if (FXO.sparks) duelStage.parts.push({ k: "flash", x: ch.x, y: -90, r: 70, life: 0.25, age: 0 });
         } else if (f.move) {
           let kind = null;
           if (t.comboLevel > p.lastCombo) { kind = "finisher"; p.lastCombo = t.comboLevel; }
@@ -496,5 +505,5 @@ const DuelChars = (() => {
     return k;
   }
 
-  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, botKey, defOf, duelStage, sparStage, previewStage };
+  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, botKey, defOf, duelStage, sparStage, previewStage, setFx, FXO };
 })();

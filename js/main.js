@@ -144,8 +144,8 @@ $("p1").innerHTML = statsHtml();
 $("p2").innerHTML = statsHtml();
 const panels = [panelRefs($("hp1"), $("p1")), panelRefs($("hp2"), $("p2"))];
 
-// The palette is defined once in CONFIG.theme; write it onto :root so CSS and canvas always agree.
-for (const k in UI) document.documentElement.style.setProperty("--" + k, UI[k]);
+// The palette is defined once in CONFIG.theme and applied by Themes.init() (js/themes.js), which writes it onto
+// :root so CSS and canvas always agree and also handles the player's theme, background and custom CSS.
 document.documentElement.style.setProperty("--font", CONFIG.theme.font);
 
 // The fighter's name under the player's name, and one combo pip per clean word of a combo level.
@@ -169,15 +169,35 @@ if (savedSettings && typeof savedSettings === "object") {
 function saveSettings() {
   try { localStorage.setItem(SET.storageKey, JSON.stringify(settings)); } catch (e) { /* not saved, still works */ }
 }
+// The HUD panels get their own opacity; the scanline stripes on the menus follow the Scanlines setting.
+function applyHud() {
+  const root = document.documentElement.style;
+  root.setProperty("--hud-bg", Themes.rgba(UI.surface, settings.hudOpacity));
+  root.setProperty("--scan", settings.scanlines && !settings.reduceMotion ? (Themes.light ? "rgba(0, 0, 0, 0.05)" : "rgba(0, 0, 0, 0.18)") : "transparent");
+}
+let scaleKey = "";
 function applySettings() {
-  renderer.shakeScale = settings.reduceMotion ? 0 : settings.shake;
-  renderer.noFlash = settings.reduceMotion;
-  renderer.reduceMotion = settings.reduceMotion;
+  const rm = settings.reduceMotion;
+  renderer.shakeScale = rm ? 0 : settings.shake;
+  renderer.noFlash = rm || !settings.flash;
+  renderer.reduceMotion = rm;
   renderer.damageNumbers = settings.damageNumbers;
-  duel.hitstopOn = !settings.reduceMotion; // visual only: hit-stop freezes poses, never rules
-  ui.classList.toggle("reduce-motion", settings.reduceMotion);
+  renderer.sceneryLevel = settings.sceneryLevel;
+  renderer.scanlines = settings.scanlines;
+  renderer.sweep = settings.sweep;
+  duel.hitstopOn = !rm && settings.hitstop; // visual only: hit-stop freezes poses, never rules
+  DuelChars.setFx({ sparks: settings.fxSparks, smears: settings.fxSmears, afterimages: settings.fxAfterimages,
+    dust: settings.fxDust, glow: settings.fxGlow, budget: settings.fxBudget });
+  ui.classList.toggle("reduce-motion", rm);
+  ui.classList.toggle("hide-wpm", !settings.showWpm);
+  ui.classList.toggle("hide-power", !settings.showPower);
+  ui.classList.toggle("hide-edge", !settings.showEdge);
+  $("perf").classList.toggle("hidden", !settings.showFps);
   Sfx.setEnabled(settings.sound);
   Sfx.setVolume(settings.volume);
+  applyHud();
+  const key = settings.renderScale + "|" + settings.uiScale;
+  if (key !== scaleKey) { scaleKey = key; resize(); }
 }
 
 // ---------- View mode: "overhead" (words float over the fighters) or "classic" (typing box) ----------
@@ -210,7 +230,8 @@ function viewName() { return viewMode === "overhead" ? "Over-head" : "Classic"; 
 let uiScale = 1;
 function resize() {
   const V = CONFIG.view, w = window.innerWidth, h = window.innerHeight;
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const native = Math.min(window.devicePixelRatio || 1, 3);
+  const dpr = settings.renderScale ? Math.min(native, settings.renderScale) : native; // Graphics > Render scale caps it
   const canvas = $("arena");
   canvas.style.width = w + "px";
   canvas.style.height = h + "px";
@@ -220,7 +241,7 @@ function resize() {
   renderer.res = canvas.height / (over ? V.height : V.classicHeight);
   renderer.floorFromBottom = over ? V.floorFromBottom : V.classicFloorFromBottom;
 
-  uiScale = Math.max(V.uiMinScale, Math.min(V.uiMaxScale, w / V.uiSize[0], h / V.uiSize[1]));
+  uiScale = Math.max(V.uiMinScale, Math.min(V.uiMaxScale, w / V.uiSize[0], h / V.uiSize[1])) * settings.uiScale; // x Graphics > Interface size
   ui.style.width = w / uiScale + "px";
   ui.style.height = h / uiScale + "px";
   ui.style.transform = `scale(${uiScale})`;
@@ -350,8 +371,10 @@ let botCfg = null;       // the bot settings of the current match
 let botIndex = 3;        // DUELIST
 let shownResult = false;
 let resultShownAt = 0;   // keys are ignored for a moment after the result appears (you may still be typing)
-let wpmTrace = [];       // [your wpm, bot wpm] twice a second during the match (visual only, for the result chart)
-let traceNext = 0;
+let rec = null;          // Stats.Recorder of the match in progress (js/stats.js): watches your typing, never changes it
+let traceNext = 0;       // next half second to sample for the speed graph
+let matchSpace = true;   // "Space ends a word" for this fight, fixed when the fight starts
+let lastRecord = null;   // the record of the match on the result screen
 
 function inMatch() { return duel.phase === "countdown" || duel.phase === "fight"; }
 function topModal() { return modals[modals.length - 1] || null; }
@@ -379,43 +402,51 @@ function botCard(b, i) {
   const cfg = botCfgFor(i), d = charDef(botCharFor(i));
   return `<button class="bot-opt pick ${b.match ? "match" : ""} ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1">` +
     `${kb(i + 1)}<span><span class="bname">${b.name}<i>${d.name}</i></span><span class="bstyle">${b.style}</span></span>` +
-    `<span class="beat">beat it at about<b>${Math.round(cfg.beatAt)} wpm</b></span></button>`;
+    `<span class="beat">win at about<b>${Math.round(cfg.beatAt)} wpm</b></span></button>`;
 }
 
 function renderTitle() {
   showScreen("title");
   const cfg = botCfgFor(botIndex);
   $("title-menu").innerHTML =
-    mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, about ${Math.round(cfg.beatAt)} wpm`) +
-    mbtn("fighter", "Fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("settings", "Settings", "S");
-  $("title-bots").innerHTML = `<div class="card-label"><span>Opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
-  keyline([keyBtn("nextbot", botKeys(), "bot"), keyBtn("view", "F2", "view: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+    mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, win at about ${Math.round(cfg.beatAt)} WPM`) +
+    mbtn("fighter", "Choose fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("stats", "My stats", "T") + mbtn("settings", "Settings", "S");
+  $("title-bots").innerHTML = `<div class="card-label"><span>Choose your opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
+  keyline([keyBtn("nextbot", botKeys(), "opponent"), keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
   applyLooks();
 }
 
-// How to play, built from CONFIG so the numbers always match the rules.
+// How to play, built from CONFIG so the numbers always match the rules. Plain words first, numbers second.
 function renderHowto() {
   showScreen("howto");
   const D = CONFIG.duel, U = D.ultimate, w = weaponFor("medium");
+  const pct = (v) => Math.round(v * 100);
   $("scr-howto").innerHTML = `
     <h2 class="screen-title">How to play</h2>
-    <div class="group"><h3>Basics</h3>
-      <p>Type the words. <b>Space</b> ends a word, <b>Backspace</b> fixes a letter.</p>
-      <p><b>Power</b> is your wpm, plus your combo bonus. It is your attack and your guard.</p>
-      <p>The faster typist hits for the difference; the blocked part heals you both (max ${D.maxHp} HP). <b>Edge</b>, at the top, shows the swing in HP per second.</p>
+    <p class="lead">Two typists fight at the same time. <b>Type faster and cleaner than your opponent</b> and your fighter does the hitting. Empty their HP bar to win.</p>
+    <div class="cols">
+      <div class="group"><h3>1. Type the words</h3>
+        <p>The word above your fighter is yours. Type it, then press <kbd>Space</kbd>. <kbd>Backspace</kbd> fixes a letter. A red bar under a letter means a mistake.</p></div>
+      <div class="group"><h3>2. Speed is attack and guard</h3>
+        <p><b>WPM</b> means words per minute. Whoever types faster hits for the <b>difference</b>. The part that gets blocked heals you both, up to ${D.maxHp} HP.</p></div>
+      <div class="group"><h3>3. Build a combo</h3>
+        <p>Type ${w.wordsPerCombo} words in a row with no mistakes to fill the pips. That is <b>one combo level</b>: +${pct(w.comboBonus)}% power each. One wrong key resets it.</p></div>
+      <div class="group"><h3>4. Break theirs, steal a counter</h3>
+        <p>When a mistake breaks a combo, the other typist gets a <b>counter</b>: +${pct(D.counter.powerBonus)}% power for ${D.counter.duration} second.</p></div>
+      <div class="group ult"><h3>5. Land your ultimate</h3>
+        <p>Type fast to fill the gold bar. At 100% and combo x${w.comboRequired}, a <b>gold word</b> appears. Type it clean for ${U.damage} damage and a ${U.stun} second stun. A messy one only does ${U.sloppyDamage}.</p></div>
+      <div class="group"><h3>Choosing an opponent</h3>
+        <p>Every opponent shows the WPM you need to win about half the time. Start low. <b>Match me</b> copies your own recent speed.</p></div>
     </div>
-    <div class="group"><h3>Combos and counter</h3>
-      <p>${w.wordsPerCombo} clean words in a row fill the pips: <b>+1 combo</b>, +${Math.round(w.comboBonus * 100)}% power. One wrong key breaks it.</p>
-      <p>Break your combo and the other typist gets a <b>counter</b>: +${Math.round(D.counter.powerBonus * 100)}% power for ${D.counter.duration} s. Break theirs and it is yours.</p>
-    </div>
-    <div class="group ult"><h3>Ultimate</h3>
-      <p>Full gold bar and combo x${w.comboRequired}: a <b>gold word</b> appears. Type it clean for ${U.damage} damage and a ${U.stun} s stun. A sloppy one deals ${U.sloppyDamage}.</p>
-      <p>Your word floats over your fighter, the bot's over the bot, so you see its attacks coming. <b>Esc</b> pauses.</p>
-    </div>
-    <div class="group"><h3>Fighters</h3>
-      <p>Every word is a strike from your fighter's own random combo; a long word swings harder, a new combo level ends on a knockdown. Fighters only change the look and the moves: the numbers are the same for all, so the bot's speed is the only difficulty.</p>
-    </div>
-    <div class="btn-row">${btn("back", "Back", "Esc")}${btn("fighter", "Fighter", "C")}${btn("play", "Fight", "Enter", "primary")}</div>`;
+    <div class="legend"><h3>Reading the screen</h3>
+      <dl>
+        <dt>Top corners</dt><dd>HP. Yours on the left, theirs on the right.</dd>
+        <dt>EDGE</dt><dd>Who is winning right now. The marker slides toward the leader; the number is HP per second.</dd>
+        <dt>WPM and POWER</dt><dd>Your speed, and your speed plus combo and counter bonuses.</dd>
+        <dt>Pips and ULT</dt><dd>Words toward the next combo level, and the ultimate charge.</dd>
+        <dt>Keys</dt><dd><kbd>Esc</kbd> pause, <kbd>Enter</kbd> start, <kbd>S</kbd> settings, <kbd>T</kbd> your stats.</dd>
+      </dl></div>
+    <div class="btn-row">${btn("back", "Back", "Esc")}${btn("fighter", "Choose fighter", "C")}${btn("play", "Fight", "Enter", "primary")}</div>`;
   keyline([]);
 }
 
@@ -424,7 +455,11 @@ function begin() {
   modals = [];
   renderModal();
   botCfg = botCfgFor(botIndex);
-  duel.start((Math.random() * 1e9) | 0);
+  const seed = (Math.random() * 1e9) | 0;
+  duel.start(seed);
+  matchSpace = settings.wordSubmit; // changing it in the pause menu applies from the next fight
+  rec = new Stats.Recorder({ mode: matchSpace ? "space" : "auto", seed, bot: botCfg.name, botIdx: botIndex, beatAt: botCfg.beatAt,
+    char: charKey, foeChar: botCharFor(botIndex) });
   setPanelChar(0, charKey, duel.typists[0].weapon);
   setPanelChar(1, botCharFor(botIndex), duel.typists[1].weapon);
   panels[1].name.textContent = botCfg.name;
@@ -432,7 +467,6 @@ function begin() {
   bot = new Bot(botCfg, duel.streams[1], (events, t) => duel.handleEvents(1, events, t));
   bot.nextKeyAt = 0.6; // a human like pause before the bot starts
   view = new StreamView(duel.streams[0]);
-  wpmTrace = [];
   traceNext = 0;
   showScreen(null);
 }
@@ -455,46 +489,41 @@ function accuracy(t) {
   return n ? Math.round((s.correct / n) * 100) + "%" : "-";
 }
 
-// A small WPM-over-time line for both players (SVG, drawn from wpmTrace).
-function wpmChart() {
-  const W = 600, H = 64, n = wpmTrace.length;
-  if (n < 2) return `<div class="chart-head"><span>WPM over time</span></div><svg viewBox="0 0 ${W} ${H}"></svg>`;
-  const top = Math.max(40, ...wpmTrace.map((p) => Math.max(p[0], p[1])));
-  const max = Math.ceil(top / 20) * 20;
-  const line = (i) => wpmTrace.map((p, k) => `${((k / (n - 1)) * W).toFixed(1)},${(H - (p[i] / max) * H).toFixed(1)}`).join(" ");
-  const grid = [0.5, 1].map((f) => `<line x1="0" x2="${W}" y1="${H - f * H}" y2="${H - f * H}" stroke="${UI.line}" stroke-width="1" stroke-dasharray="2 4"/>` +
-    `<text x="4" y="${H - f * H + 14}" fill="${UI.dim}" font-size="12">${Math.round(max * f)}</text>`).join("");
-  const you = getComputedStyle(document.documentElement).getPropertyValue("--you").trim();
-  const foe = getComputedStyle(document.documentElement).getPropertyValue("--foe").trim();
-  return `<div class="chart-head"><span>WPM over time, ${duel.t.toFixed(0)} s</span><span>` +
-    `<span class="key-i"><i style="background:${you}"></i>YOU</span><span class="key-i"><i style="background:${foe}"></i>${botCfg.name}</span></span></div>` +
-    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Words per minute over the match">${grid}` +
-    `<line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="${UI.line}" stroke-width="1"/>` +
-    `<polyline points="${line(1)}" fill="none" stroke="${foe}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>` +
-    `<polyline points="${line(0)}" fill="none" stroke="${you}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
-}
-
 function showResult() {
   showScreen("result");
   const youWon = duel.result.winner === 0;
   $("ko-title").className = youWon ? "win" : "lose";
   $("ko-title").textContent = youWon ? "YOU WIN" : "YOU LOSE";
   Sfx.play(youWon ? "win" : "lose");
-  $("ko-sub").textContent = `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (beat it at about ${Math.round(botCfg.beatAt)} wpm)`;
+  $("ko-sub").textContent = `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (win at about ${Math.round(botCfg.beatAt)} WPM)`;
   const col = (t, i, name) => `<div class="rcol panel" style="--id:var(${i ? "--foe" : "--you"})"><h3>${name}</h3><dl>
     <dt>Average WPM</dt><dd>${avgWpm(t)}</dd><dt>Accuracy</dt><dd>${accuracy(t)}</dd>
     <dt>Best combo</dt><dd>x${t.stats.bestCombo}</dd><dt>Ultimates landed</dt><dd>${t.stats.ultimates}</dd></dl></div>`;
   $("result-cols").innerHTML = col(duel.typists[0], 0, "YOU") + col(duel.typists[1], 1, botCfg.name);
-  $("wpm-chart").innerHTML = wpmChart();
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  $("wpm-chart").innerHTML = StatsPage.resultChart(lastRecord, css("--you"), css("--foe"));
+  $("result-extra").innerHTML = StatsPage.resultExtra(lastRecord);
   resultBots();
 }
 
 function resultBots() {
-  $("result-bots").innerHTML = `<div class="card-label"><span>Change bot</span><span>${botKeys()}</span></div>` +
+  $("result-bots").innerHTML = `<div class="card-label"><span>Pick another opponent</span><span>${botKeys()}</span></div>` +
     BOTS.map((b, i) => `<button class="bot-chip pick ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1"><b>${b.name}</b>${Math.round(botCfgFor(i).beatAt)} wpm</button>`).join("");
-  $("result-btns").innerHTML = btn("rematch", "Rematch", "Enter", "primary") + btn("nextbot", "Change bot", botKeys()) + btn("menu", "Menu", "Esc");
+  $("result-btns").innerHTML = btn("rematch", "Rematch", "Enter", "primary") + btn("nextbot", "Next opponent", botKeys()) + btn("stats", "My stats", "T") + btn("menu", "Main menu", "Esc");
   keyline([keyBtn("fighter", "C", "fighter"), keyBtn("howto", "H", "how to play"), keyBtn("settings", "S", "settings"),
-    keyBtn("view", "F2", "view: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+    keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+}
+
+// ---------- Stats screen (js/stats-page.js draws it from the saved match records) ----------
+function openStats(id) {
+  if (screen === "title" || screen === "result") back = screen;
+  showScreen("stats");
+  StatsPage.open($("scr-stats"), id);
+  keyline([keyBtn("back", "Esc", "back")]);
+}
+function closeStats() {
+  StatsPage.close();
+  if (back === "result" && lastRecord) { showScreen("result"); resultBots(); } else renderTitle();
 }
 
 // ---------- Fighter screen: pick one of the 11 fighters ----------
@@ -509,7 +538,7 @@ function openFighter() {
   pickIndex = Math.max(0, ROSTER.indexOf(charKey));
   showScreen("fighter");
   $("chars").innerHTML = ROSTER.map((k, i) => { const d = charDef(k); return `<button class="char pick" data-act="char:${i}" tabindex="-1"><b>${d.name}</b><span>${d.title}</span></button>`; }).join("");
-  $("fighter-btns").innerHTML = btn("back", "Back", "Esc") + btn("confirm", "Confirm", "Enter", "primary");
+  $("fighter-btns").innerHTML = btn("back", "Back", "Esc") + btn("confirm", "Use this fighter", "Enter", "primary");
   keyline([keyBtn("prev", "Left", "previous"), keyBtn("next", "Right", "next"), keyBtn("down", "Up / Down", "row")]);
   sizePreview();
   renderFighter();
@@ -560,6 +589,7 @@ function renderModal() {
   m.classList.toggle("hidden", !top);
   if (!top) return;
   m.dataset.top = top;
+  if (top !== "settings") m.classList.remove("preview");
   if (top === "pause") {
     $("mod-pause").innerHTML = `<h2 class="screen-title">Paused</h2>` +
       mbtn("resume", "Resume", "Esc", "primary") + mbtn("restart", "Restart", "R") + mbtn("settings", "Settings", "S") + mbtn("quit", "Quit to menu", "Q") +
@@ -582,85 +612,273 @@ function closeModal() {
   else if (!modals.length && screen === "result") resultBots();
 }
 
-// Settings rows, built from CONFIG.settings. Each option is [value, label].
+// ---------- Settings screen ----------
+// Seven tabs. Most rows are built from the data below: a row is a set of choices (seg), a slider (range), a button,
+// a heading or a note. The Theme and Custom tabs are built by hand (themeHtml, customHtml). Every setting here is
+// visual or about input; none changes a rule.
+const ON_OFF = [[true, "On"], [false, "Off"]];
+const toggleRow = (id, label, hint) => ({ id, label, hint, opts: ON_OFF, get: () => settings[id], set: (v) => { settings[id] = v; } });
+const pct = (v) => Math.round(v * 100) + "%";
 const SETTINGS_TABS = [
   { name: "Game", rows: [
-    { id: "view", label: "View", hint: "Over-head: words float over the fighters. Classic: a typing box.",
+    { id: "view", label: "Where words appear", hint: "Over-head: the word floats above each fighter. Classic: a typing box at the bottom.",
       opts: [["overhead", "Over-head"], ["classic", "Classic"]], get: () => viewMode, set: (v) => setView(v) },
-    { id: "wordSubmit", label: "Word submit", hint: "On: Space or Enter ends a word. Off: a full word advances by itself.",
-      opts: [[true, "On"], [false, "Off"]], get: () => settings.wordSubmit, set: (v) => { settings.wordSubmit = v; } },
-    { id: "damageNumbers", label: "Damage numbers", hint: "The net HP numbers beside each fighter.",
-      opts: [[true, "On"], [false, "Off"]], get: () => settings.damageNumbers, set: (v) => { settings.damageNumbers = v; } },
+    toggleRow("damageNumbers", "Damage numbers", "Show the HP gained or lost next to each fighter."),
   ] },
-  { name: "Video", rows: [
-    { id: "reduceMotion", label: "Reduce motion", hint: "Turns off screen shake, flashes and hit-stop.",
+  { name: "Typing", rows: [
+    { id: "wordSubmit", label: "Space ends a word", hint: "On: press Space (or Enter) after each word. Off: a word ends by itself when it is exactly right.",
+      opts: ON_OFF, get: () => settings.wordSubmit, set: (v) => { settings.wordSubmit = v; } },
+    { type: "note", html: "<b>On</b> works like Monkeytype. <b>Off</b> saves a key per word: the moment a word is typed exactly right, the caret jumps to the next one. " +
+      "A word with a wrong letter still needs <kbd>Space</kbd>, or <kbd>Backspace</kbd> and a fix. Your speed is counted the same either way " +
+      "(the Space you skip is not counted), but the two modes are different races, so your stats keep them apart." },
+  ] },
+  { name: "Graphics", rows: [
+    { type: "head", label: "Speed" },
+    { id: "renderScale", label: "Render scale", hint: "Lower is faster on a weak laptop. 100% is one canvas pixel per screen pixel; Native uses every pixel your display has.",
+      opts: SET.renderScaleSteps, get: () => settings.renderScale, set: (v) => { settings.renderScale = v; } },
+    { id: "sceneryLevel", label: "Background scenery", hint: "Full: skyline, desks and arcade cabinets. Simple: sky and floor. Off: a flat color or your own image.",
+      opts: SET.scenerySteps, get: () => settings.sceneryLevel, set: (v) => { settings.sceneryLevel = v; } },
+    { id: "frameCap", label: "Frame rate limit", hint: "Stops the game from drawing faster than this, which saves battery. None follows your screen.",
+      opts: SET.frameCapSteps, get: () => settings.frameCap, set: (v) => { settings.frameCap = v; } },
+    toggleRow("showFps", "Show FPS", "A small counter in the top right corner with frames per second and the time each frame takes."),
+    { type: "head", label: "Effects" },
+    toggleRow("fxSparks", "Sparks and flames", "Hit sparks, flashes, fire and ice chips."),
+    toggleRow("fxSmears", "Weapon trails", "The streak behind a swinging weapon."),
+    toggleRow("fxAfterimages", "Afterimages", "The ghost copies behind a fast fighter."),
+    toggleRow("fxDust", "Dust and rings", "Dust from steps and landings, and the rings on the floor."),
+    toggleRow("fxGlow", "Fighter glow", "The soft halo in each player's color."),
+    { id: "fxBudget", label: "Effect limit", hint: "The most effect particles on screen at once.",
+      opts: SET.budgetSteps, get: () => settings.fxBudget, set: (v) => { settings.fxBudget = v; } },
+    { type: "head", label: "Screen" },
+    { id: "reduceMotion", label: "Reduce motion", hint: "One switch that turns off shake, flashes, hit-stop and animations.",
       opts: [[false, "Off"], [true, "On"]], get: () => settings.reduceMotion, set: (v) => { settings.reduceMotion = v; } },
-    { id: "shake", label: "Screen shake", hint: () => (settings.reduceMotion ? "Off while reduce motion is on." : "How hard the screen shakes on big hits."),
-      opts: SET.shakeSteps, get: () => settings.shake, set: (v) => { settings.shake = v; } },
-    { id: "fullscreen", label: "Fullscreen", hint: "Also F on the menus and the button in the top bar.",
+    { id: "shake", type: "range", label: "Screen shake", min: SET.shake.min, max: SET.shake.max, step: SET.shake.step,
+      hint: () => (settings.reduceMotion ? "Off while Reduce motion is on." : "How hard the screen shakes on big hits. 0% is none, 100% is normal."),
+      get: () => settings.shake, set: (v) => { settings.shake = v; }, fmt: pct },
+    { type: "button", label: "Try the shake", hint: "Shakes the screen once at the strength above.", button: "Shake now", run: () => renderer.kick(18) },
+    toggleRow("flash", "Ultimate flash", "The bright flash when an ultimate lands."),
+    toggleRow("hitstop", "Hit-stop", "A tiny freeze on big hits. It only pauses the pictures, never the typing."),
+    toggleRow("scanlines", "Scanlines", "The fine horizontal lines over the scenery and menus."),
+    toggleRow("sweep", "Light sweep", "The slow band of light that slides down the background."),
+    { id: "fullscreen", label: "Fullscreen", hint: "Also the F key on the menus and the button in the top bar.",
       opts: [[false, "Off"], [true, "On"]], get: () => isFullscreen(), set: (v) => setFullscreen(v) },
+    { type: "head", label: "Fight display" },
+    { id: "uiScale", label: "Interface size", hint: "Makes the HUD and menus bigger or smaller.",
+      opts: SET.uiScaleSteps, get: () => settings.uiScale, set: (v) => { settings.uiScale = v; } },
+    { id: "hudOpacity", type: "range", label: "HUD panel opacity", min: SET.hudOpacity.min, max: SET.hudOpacity.max, step: SET.hudOpacity.step,
+      hint: "Lower lets you see more of the arena through the panels.", get: () => settings.hudOpacity, set: (v) => { settings.hudOpacity = v; }, fmt: pct },
+    toggleRow("showWpm", "Show WPM", "Your speed and the opponent's, in the bottom corners."),
+    toggleRow("showPower", "Show power", "Power is your WPM plus your combo bonus."),
+    toggleRow("showEdge", "Show the edge bar", "The tug of war at the top that shows who is winning the exchange."),
   ] },
-  { name: "Audio", rows: [
-    { id: "sound", label: "Sound effects", hint: "Hits, typing clicks, combos, the countdown and the K.O.",
-      opts: [[true, "On"], [false, "Off"]], get: () => settings.sound, set: (v) => { settings.sound = v; } },
+  { name: "Sound", rows: [
+    toggleRow("sound", "Sound effects", "Hits, typing clicks, combos, the countdown and the K.O."),
     { id: "volume", label: "Volume", hint: "How loud the sound effects play.",
       opts: SET.volumeSteps, get: () => settings.volume, set: (v) => { settings.volume = v; Sfx.unlock(); } },
   ] },
-  { name: "Controls", rows: [] },
+  { name: "Theme", html: () => themeHtml(), preview: true },
+  { name: "Custom", html: () => customHtml(), preview: true },
+  { name: "Keys", rows: [] },
 ];
+const isRow = (r) => !r.type || r.type === "range" || r.type === "button";   // rows the keyboard can focus
 function keyRows() { return [
   ["Typing", settings.wordSubmit ? "Letters type, <kbd>Space</kbd> or <kbd>Enter</kbd> ends a word, <kbd>Backspace</kbd> fixes a letter" :
-    "Letters type, full words submit automatically, <kbd>Backspace</kbd> fixes a letter before the word is full"],
+    "Letters type, a word ends when it is exactly right (or press <kbd>Space</kbd>), <kbd>Backspace</kbd> fixes a letter"],
   ["Pause", "<kbd>Esc</kbd> in a fight (leaving the tab pauses too)"],
   ["Pause menu", "<kbd>Esc</kbd> resume, <kbd>R</kbd> restart, <kbd>S</kbd> settings, <kbd>Q</kbd> quit"],
-  ["Title and result", "<kbd>Enter</kbd> fight, <kbd>1</kbd> to <kbd>7</kbd> bot, <kbd>C</kbd> fighter, <kbd>H</kbd> how to play"],
-  ["", "<kbd>S</kbd> settings, <kbd>F2</kbd> view, <kbd>F</kbd> fullscreen, <kbd>Esc</kbd> menu (result)"],
+  ["Title and result", "<kbd>Enter</kbd> fight, <kbd>1</kbd> to <kbd>7</kbd> opponent, <kbd>C</kbd> fighter, <kbd>H</kbd> how to play"],
+  ["", "<kbd>T</kbd> stats, <kbd>S</kbd> settings, <kbd>F2</kbd> view, <kbd>F</kbd> fullscreen, <kbd>Esc</kbd> menu (result)"],
   ["Fighter", "<kbd>Left</kbd> <kbd>Right</kbd> pick, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Enter</kbd> confirm, <kbd>Esc</kbd> back"],
-  ["Settings", "<kbd>1</kbd> to <kbd>4</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
+  ["Settings", "<kbd>1</kbd> to <kbd>7</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
+  ["Stats", "<kbd>Up</kbd> <kbd>Down</kbd> scroll, <kbd>Esc</kbd> or <kbd>T</kbd> back"],
   ["Mouse", "Click any button or key chip. Typing stays on the keyboard."],
 ]; }
 
 function openSettings() {
   if (topModal() === "settings") return;
   modals.push("settings");
-  setRow = 0;
+  setRow = firstRow(SETTINGS_TABS[setTab]);
   renderModal();
+}
+const firstRow = (tab) => (tab.rows ? Math.max(0, tab.rows.findIndex(isRow)) : 0);
+const rowKeys = (tab) => (tab.rows || []).map((r, i) => (isRow(r) ? i : -1)).filter((i) => i >= 0);
+
+function rowHtml(r, ri) {
+  if (r.type === "head") return `<div class="set-head">${r.label}</div>`;
+  if (r.type === "note") return `<p class="set-note">${r.html}</p>`;
+  const hint = typeof r.hint === "function" ? r.hint() : r.hint;
+  const lbl = `<span class="lbl">${r.label}<span class="hint">${hint}</span></span>`;
+  let ctl;
+  if (r.type === "range") {
+    const v = r.get();
+    ctl = `<span class="rng"><input type="range" min="${r.min}" max="${r.max}" step="${r.step}" value="${v}" data-range="${ri}" tabindex="-1" aria-label="${r.label}"><output>${r.fmt(v)}</output></span>`;
+  } else if (r.type === "button") {
+    ctl = `<span class="segs"><button class="seg" data-act="run:${ri}" tabindex="-1">${r.button}</button></span>`;
+  } else {
+    const cur = r.get();
+    ctl = `<span class="segs">${r.opts.map(([v, label], oi) => `<button class="seg ${v === cur ? "sel" : ""}" data-act="set:${ri}:${oi}" tabindex="-1">${label}</button>`).join("")}</span>`;
+  }
+  return `<div class="set-row ${ri === setRow ? "focus" : ""}" data-row="${ri}">${lbl}${ctl}</div>`;
 }
 
 function renderSettings() {
   const tab = SETTINGS_TABS[setTab];
-  setRow = Math.min(setRow, Math.max(0, tab.rows.length - 1));
+  if (tab.rows && !isRow(tab.rows[setRow] || {})) setRow = firstRow(tab);
   const tabs = SETTINGS_TABS.map((t, i) => `<button class="tab ${i === setTab ? "sel" : ""}" data-act="tab:${i}" tabindex="-1">${t.name}${kb(i + 1)}</button>`).join("");
   let body;
-  if (tab.rows.length) {
-    body = tab.rows.map((r, ri) => {
-      const cur = r.get(), hint = typeof r.hint === "function" ? r.hint() : r.hint;
-      const segs = r.opts.map(([v, label], oi) => `<button class="seg ${v === cur ? "sel" : ""}" data-act="set:${ri}:${oi}" tabindex="-1">${label}</button>`).join("");
-      return `<div class="set-row ${ri === setRow ? "focus" : ""}"><span class="lbl">${r.label}<span class="hint">${hint}</span></span><span class="segs">${segs}</span></div>`;
-    }).join("");
-  } else {
-    body = `<table class="keys-table">${keyRows().map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
-  }
+  if (tab.html) body = tab.html();
+  else if (tab.rows.length) body = tab.rows.map(rowHtml).join("");
+  else body = `<table class="keys-table">${keyRows().map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("")}</table>`;
+  const old = $("mod-settings").querySelector(".set-rows");
+  const scroll = old ? old.scrollTop : 0;
   $("mod-settings").innerHTML = `<h2 class="screen-title">Settings</h2><div class="tabs">${tabs}</div>` +
     `<div class="set-rows">${body}</div><div class="btn-row">${btn("back", "Back", "Esc", "primary")}</div>`;
+  const box = $("mod-settings").querySelector(".set-rows");
+  box.scrollTop = scroll;
+  $("modal").classList.toggle("preview", !!tab.preview); // Theme and Custom: the screen behind stays visible
 }
 
+// A change from a row: store, apply, redraw. Sliders skip the redraw so the thumb is not replaced mid-drag.
 function setValue(ri, oi) {
   const r = SETTINGS_TABS[setTab].rows[ri];
-  if (!r) return;
+  if (!r || !isRow(r) || r.type) return;
   setRow = ri;
   r.set(r.opts[oi][0]);
   saveSettings();
   applySettings();
   renderSettings();
 }
+function runRow(ri) {
+  const r = SETTINGS_TABS[setTab].rows[ri];
+  if (!r || r.type !== "button") return;
+  setRow = ri;
+  r.run();
+  renderSettings();
+}
+function rangeValue(ri, v, redrawOutput = true) {
+  const r = SETTINGS_TABS[setTab].rows[ri];
+  if (!r || r.type !== "range") return;
+  const step = r.step, val = Math.round(Math.max(r.min, Math.min(r.max, v)) / step) * step;
+  r.set(+val.toFixed(3));
+  saveSettings();
+  applySettings();
+  const row = $("mod-settings").querySelector(`[data-row="${ri}"]`);
+  if (row) {
+    if (redrawOutput) row.querySelector("output").textContent = r.fmt(r.get());
+    row.querySelector(".hint").textContent = typeof r.hint === "function" ? r.hint() : r.hint;
+  }
+}
+function focusRow(ri) {
+  setRow = ri;
+  $("mod-settings").querySelectorAll(".set-row").forEach((el) => el.classList.toggle("focus", +el.dataset.row === ri));
+  const el = $("mod-settings").querySelector(`[data-row="${ri}"]`);
+  if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest" });
+}
 function stepValue(step) {
   const r = SETTINGS_TABS[setTab].rows[setRow];
-  if (!r) return;
-  const cur = r.opts.findIndex(([v]) => v === r.get());
-  setValue(setRow, (Math.max(0, cur) + step + r.opts.length) % r.opts.length);
+  if (!r || !isRow(r)) return;
+  if (r.type === "range") {
+    const ri = setRow;
+    rangeValue(ri, r.get() + step * r.step);
+    const inp = $("mod-settings").querySelector(`[data-range="${ri}"]`);
+    if (inp) inp.value = r.get();
+  } else if (r.type === "button") { if (step > 0) runRow(setRow); }
+  else {
+    const cur = r.opts.findIndex(([v]) => v === r.get());
+    setValue(setRow, (Math.max(0, cur) + step + r.opts.length) % r.opts.length);
+  }
 }
-function setTabTo(i) { setTab = (i + SETTINGS_TABS.length) % SETTINGS_TABS.length; setRow = 0; renderSettings(); }
+function moveRow(dir) {
+  const keys = rowKeys(SETTINGS_TABS[setTab]);
+  if (!keys.length) { const box = $("mod-settings").querySelector(".set-rows"); if (box) box.scrollBy({ top: dir * 80 }); return; }
+  const at = Math.max(0, keys.indexOf(setRow));
+  focusRow(keys[(at + dir + keys.length) % keys.length]);
+}
+function setTabTo(i) {
+  setTab = (i + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+  setRow = firstRow(SETTINGS_TABS[setTab]);
+  renderSettings();
+}
+
+// ----- Theme tab: presets, 11 color pickers, a share code -----
+function themeHtml() {
+  const cur = Themes.current;
+  const presets = Themes.PRESETS.map((p) => {
+    const sw = ["bg", "surface", "accent", "focus", "gold"].map((k) => `<i style="background:${p.slots[k]}"></i>`).join("");
+    return `<button class="preset ${cur.id === p.id ? "sel" : ""}" data-act="preset:${p.id}" tabindex="-1"><span class="sw">${sw}</span><b>${p.name}</b><span class="pn">${p.note}</span></button>`;
+  }).join("");
+  const slots = Themes.SLOTS.map((s) => `<label class="slot"><input type="color" value="${cur.slots[s.key]}" data-slot="${s.key}" tabindex="-1"><span>${s.label}</span></label>`).join("");
+  return `<div class="set-head">Pick a theme${cur.id === "custom" ? " <span class=\"tag\">custom colors</span>" : ""}</div>
+    <div class="presets">${presets}</div>
+    <div class="set-head">Change a color</div>
+    <div class="slots">${slots}</div>
+    <div class="set-head">Share code</div>
+    <div class="code-row"><input type="text" id="theme-code" value="${Themes.exportCode()}" spellcheck="false" autocomplete="off" aria-label="Theme share code">
+      <button class="seg" data-act="code:copy" tabindex="-1">Copy</button><button class="seg" data-act="code:use" tabindex="-1">Use code</button></div>
+    <p class="set-note">Copy the code to share your colors. To use a friend's, paste it in the box and press Use code. Colors change right away behind this window.</p>`;
+}
+
+// ----- Custom tab: background image and your own CSS -----
+function customHtml() {
+  const B = Themes.bg;
+  const has = B.url || B.hasFile;
+  const sl = (key, label, min, max, step, unit) =>
+    `<label class="bg-sl"><span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${B[key]}" data-bg="${key}" tabindex="-1"><output>${B[key]}${unit}</output></label>`;
+  const modes = [["cover", "Cover"], ["contain", "Contain"], ["stretch", "Stretch"]]
+    .map(([v, l]) => `<button class="seg ${B.mode === v ? "sel" : ""}" data-act="bgmode:${v}" tabindex="-1">${l}</button>`).join("");
+  return `<div class="set-head">Background image</div>
+    <div class="code-row"><input type="text" id="bg-url" value="${B.url.replace(/"/g, "&quot;")}" placeholder="https://example.com/picture.jpg" spellcheck="false" autocomplete="off" aria-label="Image address">
+      <button class="seg" data-act="bg:url" tabindex="-1">Use address</button></div>
+    <div class="code-row"><label class="seg filebtn">Choose a file<input type="file" id="bg-file" accept="image/*" tabindex="-1"></label>
+      <button class="seg" data-act="bg:clear" tabindex="-1" ${has ? "" : "disabled"}>Remove image</button>
+      <span class="set-note inline">${has ? (B.hasFile ? "Using a file from this computer." : "Using the address above.") : "No image. It replaces the far scenery; the floor and fighters stay."}</span></div>
+    <div class="bg-grid"><span class="bg-label">Size</span><span class="segs">${modes}</span>
+      ${sl("blur", "Blur", 0, 20, 1, " px")}${sl("brightness", "Brightness", 20, 150, 5, "%")}
+      ${sl("opacity", "Opacity", 0, 100, 5, "%")}${sl("saturate", "Saturation", 0, 200, 10, "%")}</div>
+    <div class="set-head">Custom CSS</div>
+    <textarea id="css-box" rows="7" spellcheck="false" maxlength="${Themes.MAX_CSS}" placeholder="/* Example */&#10;#timer { color: gold; }&#10;.hpfill { border-radius: 4px; }" aria-label="Custom CSS">${Themes.css.replace(/</g, "&lt;")}</textarea>
+    <div class="code-row"><button class="seg" data-act="css:clear" tabindex="-1">Clear CSS</button>
+      <span class="set-note inline">Only you see this CSS, and it is never sent to anyone. If something breaks, open the game with <b>?nocss</b> at the end of the address.${Themes.cssSafeMode ? " <b>Safe mode is on now.</b>" : ""}</span></div>`;
+}
+
+// Inputs inside the settings window (sliders, color pickers, text boxes) are handled by their own events.
+const modSettings = $("mod-settings");
+modSettings.addEventListener("input", (e) => {
+  const el = e.target;
+  if (el.dataset.range !== undefined) { focusRow(+el.dataset.range); rangeValue(+el.dataset.range, parseFloat(el.value)); }
+  else if (el.dataset.slot) {
+    if (Themes.setSlot(el.dataset.slot, el.value)) { const c = $("theme-code"); if (c) c.value = Themes.exportCode(); }
+  } else if (el.dataset.bg) {
+    const key = el.dataset.bg, v = parseFloat(el.value);
+    Themes.setBg({ [key]: v });
+    el.nextElementSibling.textContent = v + (key === "blur" ? " px" : "%");
+  } else if (el.id === "css-box") Themes.setCss(el.value);
+});
+modSettings.addEventListener("change", (e) => {
+  const el = e.target;
+  if (el.dataset.range !== undefined) el.blur(); // hand the keyboard back to the game's own keys
+  else if (el.dataset.slot) renderSettings();
+  else if (el.id === "bg-file" && el.files && el.files[0]) {
+    Themes.setBgFile(el.files[0]).then((ok) => { if (!ok) toast("That image could not be drawn."); renderSettings(); }).catch((err) => toast(err.message));
+  }
+});
+modSettings.addEventListener("pointerup", (e) => { if (e.target.type === "range") setTimeout(() => e.target.blur(), 0); });
+
+function themeAct(a, x) {
+  if (a === "preset") { Themes.setPreset(x); renderSettings(); }
+  else if (a === "code") {
+    const box = $("theme-code");
+    if (x === "copy") {
+      box.select();
+      try { navigator.clipboard.writeText(box.value).then(() => toast("Theme code copied."), () => toast("Press Ctrl+C to copy the code.")); } catch (err) { toast("Press Ctrl+C to copy the code."); }
+    } else if (Themes.importCode(box.value)) { toast("Theme applied."); renderSettings(); }
+    else toast("That is not a Type Boxing theme code. It looks like TB1. followed by 66 letters and digits.");
+  } else if (a === "bgmode") { Themes.setBg({ mode: x }); renderSettings(); }
+  else if (a === "bg") {
+    if (x === "clear") Themes.clearBg().then(renderSettings);
+    else Themes.setBgUrl($("bg-url").value).then((ok) => { if (!ok && $("bg-url").value.trim()) toast("That image could not be loaded."); renderSettings(); }).catch((err) => toast(err.message));
+  } else if (a === "css" && x === "clear") { Themes.setCss(""); renderSettings(); }
+}
 
 // ---------- Actions: the one place the keyboard and the mouse both go through ----------
 function act(name) {
@@ -680,6 +898,7 @@ function act(name) {
     case "back":
       if (top) closeModal();
       else if (screen === "howto") closeHowto();
+      else if (screen === "stats") { if (!StatsPage.back()) closeStats(); }
       else if (screen === "fighter") closeFighter(false);
       break;
     case "confirm": closeFighter(true); break;
@@ -696,6 +915,10 @@ function act(name) {
     case "quit-no": closeModal(); break;
     case "tab": setTabTo(+x); break;
     case "set": setValue(+x, +y); break;
+    case "run": runRow(+x); break;
+    case "preset": case "code": case "bgmode": case "bg": case "css": themeAct(a, x); break;
+    case "stats": if (!top && (screen === "title" || screen === "result")) openStats(screen === "result" && lastRecord ? lastRecord.id : undefined); break;
+    case "st": StatsPage.act(x, y, name.split(":").slice(3).join(":")); break;
   }
 }
 
@@ -722,6 +945,11 @@ function menuKey(e) {
     else if (k === "Escape") act("back");
     return;
   }
+  if (screen === "stats") {
+    if (k === "Escape" || lower === "t") act("back");
+    else if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); $("scr-stats").scrollBy({ top: k === "ArrowUp" ? -90 : 90 }); }
+    return;
+  }
   if (screen === "howto") {
     if (k === "Escape" || lower === "h") act("back");
     else if (lower === "c") act("fighter");
@@ -731,6 +959,7 @@ function menuKey(e) {
   if (screen === "title" || screen === "result") {
     if (lower === "c") act("fighter");
     else if (lower === "h") act("howto");
+    else if (lower === "t") act("stats");
     else if (lower === "s") act("settings");
     else if (lower === "f") act("fullscreen");
     else if (k === "F2") { e.preventDefault(); act("view"); }
@@ -755,11 +984,9 @@ function modalKey(top, e) {
   } else if (top === "settings") {
     if (k === "Escape") act("back");
     else if (k >= "1" && k <= String(SETTINGS_TABS.length)) setTabTo(+k - 1);
+    else if (lower === " ") stepValue(1);
     else if (k === "Tab") setTabTo(setTab + (e.shiftKey ? -1 : 1));
-    else if (k === "ArrowUp" || k === "ArrowDown") {
-      const n = SETTINGS_TABS[setTab].rows.length;
-      if (n) { setRow = (setRow + (k === "ArrowUp" ? -1 : 1) + n) % n; renderSettings(); }
-    }
+    else if (k === "ArrowUp" || k === "ArrowDown") moveRow(k === "ArrowUp" ? -1 : 1);
     else if (k === "ArrowLeft") stepValue(-1);
     else if (k === "ArrowRight" || k === "Enter") stepValue(1);
   }
@@ -775,6 +1002,12 @@ function handlePlayerTyping(evs) {
 
 window.addEventListener("keydown", (e) => {
   Sfx.unlock(); // browsers allow audio only after a key or a click
+  // A text box (theme code, image address, custom CSS) keeps its own keys; Esc leaves it.
+  const tg = e.target;
+  if (tg && (tg.tagName === "TEXTAREA" || (tg.tagName === "INPUT" && tg.type !== "range"))) {
+    if (e.key === "Escape") { e.preventDefault(); tg.blur(); }
+    return;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const top = topModal();
   if (top) { modalKey(top, e); return; }
@@ -790,15 +1023,22 @@ window.addEventListener("keydown", (e) => {
   if (duel.phase !== "fight") return; // countdown: keys are ignored
 
   if (e.key === "Backspace") { duel.streams[0].backspace(); view.update(); return; }
+  // What the player does is also noted by the recorder (stats only; it reads the stream, never changes it).
   if (e.key === " " || e.key === "Enter") {
-    const evs = duel.streams[0].submit(true);
+    const s = duel.streams[0];
+    rec.space(duel.t, s.typed, s.current().text);
+    const evs = s.submit(true);
+    rec.events(evs);
     handlePlayerTyping(evs);
     return;
   }
   if (e.key.length === 1) {
-    const evs = duel.streams[0].press(e.key.toLowerCase());
-    const s = duel.streams[0], w = s.current();
-    if (!settings.wordSubmit && s.typed.length >= w.text.length) evs.push(...s.submit(false));
+    const s = duel.streams[0], w = s.current(), ch = e.key.toLowerCase();
+    if (s.typed.length < w.text.length + 5) rec.press(duel.t, w.text[s.typed.length], ch);
+    const evs = s.press(ch);
+    // "Space ends a word" off: an exactly typed word ends by itself, with no key counted for the missing Space.
+    if (!matchSpace && s.autoEnds()) evs.push(...s.submit(false));
+    rec.events(evs);
     handlePlayerTyping(evs);
   }
 });
@@ -907,7 +1147,17 @@ function fightSounds() {
 const STEP = 1 / 120;
 let last = performance.now(), acc = 0;
 const frameStats = { n: 0, ms: 0 }; // average cost of draw + HUD per frame (for tests)
+const perf = { frames: 0, ms: 0, since: performance.now() }; // for the FPS counter (Graphics > Show FPS)
+let nextDraw = 0;                                              // frame rate limit: when the next frame may be drawn
 function loop(now) {
+  // Frame rate limit (Graphics tab): skip a display frame instead of drawing it. The simulation keeps its own fixed
+  // step, so skipping frames never changes how a fight plays.
+  if (settings.frameCap) {
+    const every = 1000 / settings.frameCap;
+    if (now < nextDraw - 1) { requestAnimationFrame(loop); return; }
+    nextDraw += every;
+    if (nextDraw < now - every) nextDraw = now; // fell behind (a pause, a slow frame): do not catch up in a burst
+  }
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   const t0 = performance.now();
@@ -918,8 +1168,11 @@ function loop(now) {
       if (bot && duel.phase === "fight") bot.update(duel.t);
       duel.update(STEP);
       acc -= STEP;
-      // Sample both typists' wpm twice a second for the result chart (visual only).
-      if (duel.phase === "fight" && duel.t >= traceNext) { wpmTrace.push([duel.wpmNow[0], duel.wpmNow[1]]); traceNext += 0.5; }
+      if (rec && duel.phase === "fight") {
+        rec.step(duel, STEP);
+        // Sample both typists twice a second for the speed graph (stats only).
+        if (duel.t >= traceNext) { rec.sample(duel); traceNext += 0.5; }
+      }
     }
     if (view) view.sync();
   } else {
@@ -928,7 +1181,9 @@ function loop(now) {
   if (duel.phase === "over" && !shownResult && duel.fighters.some((f) => f.dead && f.state === "down" && f.stateT > 0.6)) {
     shownResult = true;
     resultShownAt = performance.now();
-    wpmTrace.push([duel.wpmNow[0], duel.wpmNow[1]]);
+    rec.sample(duel);
+    lastRecord = rec.finish(duel);
+    if (!Stats.add(lastRecord)) toast("This match could not be saved to your stats: the browser's storage is full or blocked.");
     const mine = avgWpm(duel.typists[0]);
     if (mine > 0 && duel.t > 5) saveHistory(mine); // for MATCH ME
     showResult();
@@ -937,10 +1192,25 @@ function loop(now) {
   renderer.draw(duel, frozen ? 0 : dt);
   if (screen === "fighter") DuelChars.drawPreview($("fighter-preview"), ROSTER[pickIndex], frozen ? 0 : dt, settings.reduceMotion);
   updateHud(dt);
-  frameStats.n++; frameStats.ms += performance.now() - t0;
+  const cost = performance.now() - t0;
+  frameStats.n++; frameStats.ms += cost;
+  perf.frames++; perf.ms += cost;
+  if (settings.showFps && now - perf.since >= 500) {
+    $("perf").textContent = `${Math.round((perf.frames * 1000) / (now - perf.since))} FPS  ${(perf.ms / perf.frames).toFixed(1)} ms`;
+    perf.frames = 0; perf.ms = 0; perf.since = now;
+  } else if (!settings.showFps) { perf.frames = 0; perf.ms = 0; perf.since = now; }
   requestAnimationFrame(loop);
 }
 
+// The theme (colors, background image, custom CSS) comes first so the very first frame already has it.
+Themes.onChange((err) => {
+  if (err instanceof Error) toast(err.message);
+  renderer.layers = null;                                           // rebuild the scenery in the new colors
+  renderer.setBackground(Themes.bgImage, Themes.bg, Themes.bgVersion);
+  applyHud();
+  applyLooks();
+});
+Themes.init();
 applySettings();
 renderTitle();
 applyView();

@@ -122,6 +122,24 @@ class Renderer {
     this.noFlash = false;    // reduce motion: no full screen flash
     this.reduceMotion = false; // reduce motion: no plate shake on a typo
     this.damageNumbers = true; // draw the net HP numbers
+    // Graphics settings (visual only, set by main.js from the Graphics tab):
+    this.sceneryLevel = "full"; // "full" | "simple" (sky and floor only) | "off" (a flat color, or your background image)
+    this.scanlines = true;   // the baked scanlines in the scenery
+    this.sweep = true;       // the slow band of light that slides down the scenery
+    this.bgImage = null;     // custom background image (Themes), drawn in place of the far and mid layers
+    this.bgOpts = null;      // { mode, blur, brightness, opacity, saturate }
+    this.bgVersion = 0;      // bumped when the image or its filters change, so the layers rebuild
+    this.kickAmt = 0;        // an extra shake for the "Test shake" button; decays on its own
+  }
+
+  // A test shake for the settings screen (scaled by the shake setting like any other shake).
+  kick(amount) { this.kickAmt = Math.max(this.kickAmt, amount); }
+
+  // Custom background: an image (or null) and its filters. The scenery layers rebuild on the next frame.
+  setBackground(img, opts, version) {
+    this.bgImage = img || null;
+    this.bgOpts = opts ? Object.assign({}, opts) : null;
+    this.bgVersion = version || 0;
   }
 
   // Pick the pose for a fighter from its state.
@@ -189,7 +207,8 @@ class Renderer {
     ctx.save();
     ctx.setTransform(k0, 0, 0, k0, 0, 0);
     ctx.clearRect(0, 0, W0, H0);
-    const shake = sim.shake * this.shakeScale;
+    if (this.kickAmt > 0.2) this.kickAmt *= Math.pow(0.002, dt); else this.kickAmt = 0;
+    const shake = (sim.shake + this.kickAmt) * this.shakeScale;
     const jx = shake > 0 ? (Math.random() - 0.5) * shake : 0, jy = shake > 0 ? (Math.random() - 0.5) * shake : 0;
     if (this.scenery) {
       // The scenery is drawn at the normal framing (it never zooms, so its layers are built once per size).
@@ -207,7 +226,7 @@ class Renderer {
 
     // Fighters, farther ones first. On the title screen: a slow sparring loop instead.
     const C = this.chars && typeof DuelChars !== "undefined" ? this.chars : null;
-    const copt = { res: k, noShake: this.shakeScale === 0 || this.reduceMotion, shadow: CONFIG.theme.arena.shadow };
+    const copt = { res: k, noShake: this.shakeScale === 0 || this.reduceMotion, shakeScale: this.shakeScale, shadow: CONFIG.theme.arena.shadow };
     if (this.menuSpar && sim.phase === "menu") {
       const cx = sx(sim.cameraX !== undefined ? sim.cameraX : W / 2);
       if (C) DuelChars.drawSpar(ctx, C.keys, cx, floorY, this.reduceMotion ? 0 : dt, C.glows, copt);
@@ -287,7 +306,7 @@ class Renderer {
     const flashing = wrongAge >= 0 && wrongAge < P.wrongTime;
     const breakAge = now - me.lastComboBreakAt;
     const breaking = breakAge >= 0 && breakAge < P.breakTime;
-    const shakeX = flashing && !this.reduceMotion ? Math.sin(wrongAge * 95) * P.shake * (1 - wrongAge / P.wrongTime) : 0;
+    const shakeX = flashing && !this.reduceMotion ? Math.sin(wrongAge * 95) * P.shake * Math.min(1.5, this.shakeScale) * (1 - wrongAge / P.wrongTime) : 0;
 
     const x = Math.round(st.x + shakeX), y = Math.round(st.y);
     ctx.save();
@@ -411,6 +430,7 @@ class Renderer {
   // Per frame: three drawImage calls, a few blinking LEDs and one slow scanline sweep.
   buildLayers(W, H, floorY) {
     const A = CONFIG.theme.arena, M = Renderer.PAR_MARGIN, LW = W + 2 * M;
+    const level = this.sceneryLevel, full = level === "full" && !this.bgImage;
     // Layer pixels per unit: the screen's, capped so one layer stays under LAYER_MAX_PIXELS. Very large
     // offscreen canvases can drop off the fast drawing path (measured: 4.2 M pixels cost 13 ms a frame,
     // 3 M pixels cost 0.5 ms). On big screens the far layers are then a touch softer, which they can afford.
@@ -424,17 +444,24 @@ class Renderer {
     };
     let seed = 7; // fixed layout: a tiny seeded generator, so the scene is the same every time
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    const scan = (g, h) => { g.fillStyle = A.scan; for (let y = 0; y < h; y += 3) g.fillRect(0, y, LW, 1); };
+    const scan = (g, h) => { if (!this.scanlines) return; g.fillStyle = A.scan; for (let y = 0; y < h; y += 3) g.fillRect(0, y, LW, 1); };
 
     // Far: sky, glow, skyline.
     const [far, fg] = make(floorY);
-    const sky = fg.createLinearGradient(0, 0, 0, floorY);
-    sky.addColorStop(0, A.skyTop); sky.addColorStop(1, A.skyBottom);
-    fg.fillStyle = sky; fg.fillRect(0, 0, LW, floorY);
-    const glow = fg.createLinearGradient(0, floorY - 150, 0, floorY);
-    glow.addColorStop(0, "rgba(0, 0, 0, 0)"); glow.addColorStop(1, A.glow);
-    fg.fillStyle = glow; fg.fillRect(0, floorY - 150, LW, 150);
-    for (let x = -10; x < LW; ) {
+    if (level === "off") {
+      fg.fillStyle = A.skyTop; fg.fillRect(0, 0, LW, floorY); // a flat color
+    } else {
+      const sky = fg.createLinearGradient(0, 0, 0, floorY);
+      sky.addColorStop(0, A.skyTop); sky.addColorStop(1, A.skyBottom);
+      fg.fillStyle = sky; fg.fillRect(0, 0, LW, floorY);
+    }
+    if (this.bgImage) this.paintBackground(fg, LW, floorY, k);
+    if (full) {
+      const glow = fg.createLinearGradient(0, floorY - 150, 0, floorY);
+      glow.addColorStop(0, "rgba(0, 0, 0, 0)"); glow.addColorStop(1, A.glow);
+      fg.fillStyle = glow; fg.fillRect(0, floorY - 150, LW, 150);
+    }
+    for (let x = -10; full && x < LW; ) {
       const w = 40 + rnd() * 70, h = 60 + rnd() * Math.min(150, floorY * 0.4), top = floorY - 50 - h;
       fg.fillStyle = A.far; fg.fillRect(x, top, w, h + 50);
       fg.fillStyle = A.farEdge; fg.fillRect(x, top, w, 2);
@@ -446,9 +473,10 @@ class Renderer {
     scan(fg, floorY);
 
     // Mid: desks with CRT monitors, and arcade cabinets. LEDs are remembered and blink live.
-    const [mid, mg] = make(floorY);
+    // Only in the full scenery without a custom background.
+    const [mid, mg] = full ? make(floorY) : [null, null];
     const leds = [];
-    for (let x = 20, i = 0; x < LW - 60; i++) {
+    for (let x = 20, i = 0; full && x < LW - 60; i++) {
       if (i % 3 === 2) {
         // Arcade cabinet: body, marquee strip, slanted screen, control deck.
         const cw = 64, ch = 150, top = floorY - ch;
@@ -476,7 +504,7 @@ class Renderer {
         x += dw + 26;
       }
     }
-    scan(mg, floorY);
+    if (full) scan(mg, floorY);
 
     // Near: floor, perspective grid, cables.
     const fh = H - floorY;
@@ -484,24 +512,57 @@ class Renderer {
     ng.fillStyle = A.floor; ng.fillRect(0, 0, LW, fh);
     ng.strokeStyle = A.grid; ng.lineWidth = 1;
     const vx = LW / 2, depth = 260;
-    for (let gx = -LW; gx <= 2 * LW; gx += 80) {
-      ng.beginPath(); ng.moveTo(vx + (gx - vx) * 0.35, 0); ng.lineTo(gx, fh); ng.stroke();
+    if (level !== "off") {
+      for (let gx = -LW; gx <= 2 * LW; gx += 80) {
+        ng.beginPath(); ng.moveTo(vx + (gx - vx) * 0.35, 0); ng.lineTo(gx, fh); ng.stroke();
+      }
+      for (let d = 1; d < 10; d++) {
+        const y = fh * (1 - depth / (depth + d * d * 9));
+        ng.beginPath(); ng.moveTo(0, y); ng.lineTo(LW, y); ng.stroke();
+      }
     }
-    for (let d = 1; d < 10; d++) {
-      const y = fh * (1 - depth / (depth + d * d * 9));
-      ng.beginPath(); ng.moveTo(0, y); ng.lineTo(LW, y); ng.stroke();
-    }
-    ng.fillStyle = A.cable;
-    ng.fillRect(0, Math.min(fh - 6, 34), LW, 3);
+    if (full) { ng.fillStyle = A.cable; ng.fillRect(0, Math.min(fh - 6, 34), LW, 3); }
     ng.strokeStyle = A.floorLine; ng.lineWidth = 2;
     ng.beginPath(); ng.moveTo(0, 1); ng.lineTo(LW, 1); ng.stroke();
 
-    this.layers = { W, H, floorY, res: this.res, k, far, mid, near, leds };
+    this.layers = { W, H, floorY, res: this.res, k, far, mid, near, leds, key: this.layerKey() };
+  }
+
+  // What the layers were built from; a change rebuilds them on the next frame.
+  layerKey() { return [this.sceneryLevel, this.scanlines ? 1 : 0, this.bgImage ? this.bgVersion : 0, CONFIG.theme.arena.skyTop, CONFIG.theme.arena.floor].join("|"); }
+
+  // The custom background, drawn onto the far layer over the sky: cover, contain or stretch, with the four
+  // filters (blur, brightness, saturation and opacity). Done once per rebuild, so it costs nothing per frame.
+  paintBackground(g, LW, h, k) {
+    const img = this.bgImage, o = this.bgOpts || {};
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    if (!iw || !ih) return;
+    const blur = (o.blur || 0) * k;            // the slider is in drawing units; the filter works in canvas pixels
+    const pad = Math.ceil((blur * 2) / k);     // overscan so a blurred edge never fades to transparent
+    const bw = LW + 2 * pad, bh = h + 2 * pad;
+    let w = bw, hh = bh;
+    if (o.mode !== "stretch") {
+      const sc = o.mode === "contain" ? Math.min(LW / iw, h / ih) : Math.max(bw / iw, bh / ih);
+      w = iw * sc; hh = ih * sc;
+    }
+    const x = (LW - w) / 2, y = (h - hh) / 2;
+    g.save();
+    g.globalAlpha = Math.max(0, Math.min(1, (o.opacity === undefined ? 100 : o.opacity) / 100));
+    if ("filter" in g) {
+      const f = [];
+      if (blur > 0) f.push(`blur(${blur.toFixed(1)}px)`);
+      if (o.brightness !== undefined && o.brightness !== 100) f.push(`brightness(${o.brightness}%)`);
+      if (o.saturate !== undefined && o.saturate !== 100) f.push(`saturate(${o.saturate}%)`);
+      if (f.length) g.filter = f.join(" ");
+    }
+    g.beginPath(); g.rect(0, 0, LW, h); g.clip(); // keep the image above the floor
+    g.drawImage(img, x, y, w, hh);
+    g.restore();
   }
 
   drawScenery(ctx, W, H, floorY, sim, dt) {
     const L = this.layers, M = Renderer.PAR_MARGIN, A = CONFIG.theme.arena;
-    if (!L || L.W !== W || L.H !== H || L.floorY !== floorY || L.res !== this.res) this.buildLayers(W, H, floorY);
+    if (!L || L.W !== W || L.H !== H || L.floorY !== floorY || L.res !== this.res || L.key !== this.layerKey()) this.buildLayers(W, H, floorY);
     const { far, mid, near, leds } = this.layers, k = this.res, lk = this.layers.k;
     // Parallax follows the midpoint of the fighters (the duel's camera itself is fixed).
     const f = sim.fighters, centre = (sim.arenaWidth !== undefined ? sim.arenaWidth : W) / 2;
@@ -511,20 +572,24 @@ class Renderer {
     const snap = (v) => Math.round(v * k) / k;
     const lay = (c, speed, y) => ctx.drawImage(c, snap(-M - this.par * speed), y, c.width / lk, c.height / lk);
     lay(far, 0.15, 0);
-    lay(mid, 0.4, 0);
-    // Blinking LEDs on the mid layer: small, slow, out of phase.
-    const midX = snap(-M - this.par * 0.4);
-    for (const d of leds) {
-      if (Math.sin(this.clock * 1.3 + d.p) < 0.2) continue;
-      ctx.fillStyle = A.leds[d.c];
-      ctx.fillRect(midX + d.x, d.y, 3, 3);
+    if (mid) {
+      lay(mid, 0.4, 0);
+      // Blinking LEDs on the mid layer: small, slow, out of phase.
+      const midX = snap(-M - this.par * 0.4);
+      for (const d of leds) {
+        if (!this.reduceMotion && Math.sin(this.clock * 1.3 + d.p) < 0.2) continue;
+        ctx.fillStyle = A.leds[d.c];
+        ctx.fillRect(midX + d.x, d.y, 3, 3);
+      }
     }
     lay(near, 1, floorY);
     // One soft band of light slides down the screen every 9 seconds.
-    const sy = ((this.clock % 9) / 9) * (H + 60) - 30;
-    ctx.fillStyle = A.sweep;
-    ctx.fillRect(0, sy, W, 30);
-    ctx.fillRect(0, sy + 8, W, 14);
+    if (this.sweep && this.sceneryLevel === "full" && !this.reduceMotion) {
+      const sy = ((this.clock % 9) / 9) * (H + 60) - 30;
+      ctx.fillStyle = A.sweep;
+      ctx.fillRect(0, sy, W, 30);
+      ctx.fillRect(0, sy + 8, W, 14);
+    }
   }
 
   // Title screen: two stickmen trade slow, harmless punches. Drawing only, no world state.
