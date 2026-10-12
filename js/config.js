@@ -51,6 +51,24 @@ const CONFIG = {
   canvas: { w: 960, h: 540 },
   arena: { width: 3200, floorY: 410 },
 
+  // Private-room online play. PeerJS only introduces the two browsers; match data goes peer to peer.
+  net: {
+    enabled: true,
+    server: { host: null, port: null, path: null, secure: null },
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    roomCodeLength: 5,
+    roomCodeAlphabet: "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+    peerIdPrefix: "typeboxing-",
+    snapshotHz: 20,
+    pingEverySec: 2,
+    reconnectGraceSec: 15,
+    maxMessageBytes: 4096,
+    maxKeysPerMessage: 64,
+    keyBatchMs: 25,
+    readyTimeoutSec: 60,
+    gameVersion: "phase4-private-room",
+  },
+
   player: { maxHp: 100, dashSpeed: 2600, startX: 500 },
   dummy: { maxHp: 400, respawnDelay: 1.4, spawnDistance: 320 },
 

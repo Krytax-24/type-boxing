@@ -71,6 +71,16 @@
 
       <section id="scr-stats" class="screen panel"></section>
 
+      <section id="scr-online" class="screen panel">
+        <h2 class="screen-title">Online</h2>
+        <div id="online-status"></div>
+        <div id="online-room"></div>
+        <div class="online-join">
+          <input id="room-code" type="text" maxlength="7" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Room code">
+        </div>
+        <div class="btn-row" id="online-btns"></div>
+      </section>
+
       <section id="scr-fighter" class="screen">
         <div id="loadout-stage" class="panel">
           <canvas id="fighter-preview"></canvas>
@@ -113,6 +123,8 @@
 
   <script src="js/config.js"></script>
   <script src="js/themes.js"></script>
+  <script src="js/vendor/peerjs.min.js"></script>
+  <script src="js/protocol.js"></script>
   <script src="js/words.js"></script>
   <script src="js/duel-typing.js"></script>
   <script src="js/fighter.js"></script>
@@ -125,6 +137,7 @@
   <script src="js/sfx.js"></script>
   <script src="js/render.js"></script>
   <script src="js/duel.js"></script>
+  <script src="js/net.js"></script>
   <script src="js/stats.js"></script>
   <script src="js/stats-page.js"></script>
   <script src="js/main.js"></script>

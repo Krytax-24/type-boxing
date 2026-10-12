@@ -375,10 +375,18 @@ let rec = null;          // Stats.Recorder of the match in progress (js/stats.js
 let traceNext = 0;       // next half second to sample for the speed graph
 let matchSpace = true;   // "Space ends a word" for this fight, fixed when the fight starts
 let lastRecord = null;   // the record of the match on the result screen
+const online = {
+  net: null, screenState: "idle", status: "", code: "", role: null, connected: false,
+  localReady: false, remoteReady: false, localRematch: false, remoteRematch: false,
+  profile: null, peerProfile: null, seed: 0, seq: 0, snapN: 0, snapNext: 0,
+  keyQueue: [], keyFlushAt: 0, hostSentResult: false, active: false, waitingResult: null,
+  trace: [],
+};
 
 function inMatch() { return duel.phase === "countdown" || duel.phase === "fight"; }
 function topModal() { return modals[modals.length - 1] || null; }
-function paused() { return inMatch() && modals.length > 0; }
+function isOnlineMatch() { return online.active || online.screenState === "result"; }
+function paused() { return inMatch() && modals.length > 0 && !isOnlineMatch(); }
 
 function showScreen(name) {
   screen = name;
@@ -410,10 +418,52 @@ function renderTitle() {
   const cfg = botCfgFor(botIndex);
   $("title-menu").innerHTML =
     mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, win at about ${Math.round(cfg.beatAt)} WPM`) +
+    mbtn("online", "Online", "O", "", onlineAvailable() ? "private room 1v1" : "serve over http or use ?server=") +
     mbtn("fighter", "Choose fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("stats", "My stats", "T") + mbtn("settings", "Settings", "S");
   $("title-bots").innerHTML = `<div class="card-label"><span>Choose your opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
   keyline([keyBtn("nextbot", botKeys(), "opponent"), keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
   applyLooks();
+}
+
+function onlineAvailable() {
+  return typeof NetPlay !== "undefined" && NetPlay.available(CONFIG.net);
+}
+
+function onlineProfile() {
+  return { name: "PLAYER", fighter: charKey, color: CH.you.body, gameVersion: CONFIG.net.gameVersion };
+}
+
+function inviteLink() {
+  const url = new URL(location.href);
+  url.searchParams.set("room", online.code);
+  return url.href;
+}
+
+function clearRoomInput() {
+  const input = $("room-code");
+  if (input) input.value = "";
+}
+
+function renderOnline() {
+  showScreen("online");
+  const on = onlineAvailable(), state = online.screenState;
+  $("online-status").textContent = on ? (online.status || "Create a private room or join a friend's code.") :
+    "Online play needs the page served over http or https, or a LAN server override.";
+  let room = "Room codes exist only while the host keeps this page open.";
+  if (online.code) room = `<span>Room code</span><b>${online.code}</b><code>${inviteLink()}</code>`;
+  if (online.peerProfile) room += `<span>Opponent: ${online.peerProfile.name}</span>`;
+  if (online.connected && state !== "playing" && state !== "result") {
+    room += `<span>${online.localReady ? "You are ready" : "You are not ready"} / ${online.remoteReady ? "Opponent ready" : "Opponent not ready"}</span>`;
+  }
+  $("online-room").innerHTML = room;
+  $("room-code").disabled = !on || online.connected || state === "waiting" || state === "playing";
+  const readyLabel = online.localReady ? "Unready" : "Ready";
+  const readyBtn = online.connected && state !== "playing" && state !== "result" ? btn("online-ready", readyLabel, "Enter", online.localReady ? "" : "primary") : "";
+  $("online-btns").innerHTML =
+    (online.connected ? readyBtn + btn("online-leave", "Leave", "Esc") :
+      btn("online-create", "Create room", "C", "primary") + btn("online-join", "Join", "J") + btn("back", "Back", "Esc")) +
+    (on ? "" : `<span class="modal-note">For LAN, serve the folder and open with ?server=lan.</span>`);
+  keyline(online.connected ? [] : [keyBtn("fighter", "F", "fighter"), keyBtn("view", "F2", "words: " + viewName())]);
 }
 
 // How to play, built from CONFIG so the numbers always match the rules. Plain words first, numbers second.
@@ -452,6 +502,8 @@ function renderHowto() {
 
 // The bot of the selected level, and the weapons, colors and HUD for a new match.
 function begin() {
+  online.active = false;
+  online.screenState = "idle";
   modals = [];
   renderModal();
   botCfg = botCfgFor(botIndex);
@@ -471,7 +523,207 @@ function begin() {
   showScreen(null);
 }
 
+function resetOnlineState(keepNet) {
+  if (!keepNet && online.net) online.net.close();
+  clearRoomInput();
+  online.screenState = "idle";
+  online.status = "";
+  online.code = "";
+  online.role = null;
+  online.connected = false;
+  online.localReady = false;
+  online.remoteReady = false;
+  online.localRematch = false;
+  online.remoteRematch = false;
+  online.peerProfile = null;
+  online.keyQueue = [];
+  online.trace = [];
+  online.active = false;
+  online.waitingResult = null;
+  online.hostSentResult = false;
+  if (!keepNet) online.net = null;
+}
+
+function openOnline() {
+  online.profile = onlineProfile();
+  const room = new URLSearchParams(location.search).get("room");
+  renderOnline();
+  if (room && onlineAvailable() && !online.net) {
+    $("room-code").value = room.toUpperCase();
+    joinOnlineRoom();
+  }
+}
+
+function makeNet() {
+  if (online.net) online.net.close();
+  online.net = new NetPlay(CONFIG.net, { status: onlineStatus, message: onlineMessage });
+  online.profile = onlineProfile();
+  return online.net;
+}
+
+function createOnlineRoom() {
+  if (!onlineAvailable()) { toast("Serve the game over http, or use ?server=lan for LAN play."); return; }
+  resetOnlineState();
+  online.profile = onlineProfile();
+  online.screenState = "creating";
+  makeNet().createRoom();
+  renderOnline();
+}
+
+function joinOnlineRoom() {
+  if (!onlineAvailable()) { toast("Serve the game over http, or use ?server=lan for LAN play."); return; }
+  const code = NetPlay.codeOk($("room-code").value, CONFIG.net);
+  if (!code) { toast("Enter a valid room code."); return; }
+  resetOnlineState();
+  online.profile = onlineProfile();
+  online.screenState = "joining";
+  makeNet().joinRoom(code);
+  renderOnline();
+}
+
+function onlineStatus(e) {
+  online.screenState = e.state;
+  online.code = e.code || online.code;
+  online.role = e.role || online.role;
+  if (e.state === "waiting") online.status = "Share the code with your opponent.";
+  else if (e.state === "joining") online.status = "Joining room...";
+  else if (e.state === "connected") {
+    online.connected = true;
+    online.status = "Connected. Ready up when both players are here.";
+    if (online.role === "guest") online.net.send(Protocol.hello(online.profile));
+  } else if (e.state === "error") {
+    online.status = e.message || "Network error";
+    toast(online.status);
+  } else if (e.state === "closed") {
+    if (online.active) toast(e.message || "The other player left.");
+    resetOnlineState(true);
+    online.status = e.message || "Connection closed.";
+  }
+  if (screen === "online") renderOnline();
+}
+
+function safeChar(key) {
+  return Chars.DEFS[key] ? key : CH.defaultChar;
+}
+
+function onlineMessage(msg) {
+  if (msg.t === "busy") { toast("This room already has two players."); return; }
+  if (msg.t === "leave") { toast("The other player left."); goMenu(); return; }
+  if (msg.t === "error") { toast(msg.message); return; }
+  if (msg.t === "hello" && online.role === "host") {
+    if (msg.gameVersion !== CONFIG.net.gameVersion) { online.net.send(Protocol.error("The other player has a different version. Refresh the page.")); return; }
+    online.peerProfile = { name: Protocol.cleanName(msg.name), fighter: safeChar(msg.fighter), color: msg.color };
+    online.net.send(Protocol.welcome(online.profile));
+    online.status = "Opponent joined. Ready up.";
+    if (screen === "online") renderOnline();
+  } else if (msg.t === "welcome" && online.role === "guest") {
+    if (msg.gameVersion !== CONFIG.net.gameVersion) { toast("The other player has a different version. Refresh the page."); return; }
+    online.peerProfile = { name: Protocol.cleanName(msg.name), fighter: safeChar(msg.fighter), color: msg.color };
+    online.status = "Joined. Ready up.";
+    if (screen === "online") renderOnline();
+  } else if (msg.t === "ready") {
+    online.remoteReady = msg.ready;
+    if (screen === "online") renderOnline();
+    if (online.role === "host" && online.localReady && online.remoteReady) hostStartOnline();
+  } else if (msg.t === "start") {
+    guestStartOnline(msg);
+  } else if (msg.t === "keys" && online.role === "host") {
+    for (const ev of msg.events) {
+      const events = applyInputToSide(1, ev.k);
+      if (events.length) duel.handleEvents(1, events, duel.t);
+    }
+  } else if (msg.t === "state" && online.role === "guest") {
+    duel.applySnapshot(msg.s, true);
+    if (duel.phase === "fight" && duel.t >= traceNext) { online.trace.push([duel.wpmNow[0], duel.wpmNow[1], duel.typists[0].hp, duel.typists[1].hp]); traceNext += 0.5; }
+    if (duel.phase === "over" && !shownResult) online.waitingResult = msg.s.result || { winner: 0 };
+  } else if (msg.t === "result" && online.role === "guest") {
+    duel.result = { winner: 1 - msg.winner };
+    duel.phase = "over";
+    online.waitingResult = duel.result;
+  } else if (msg.t === "rematch") {
+    online.remoteRematch = msg.want;
+    if (online.role === "host" && online.localRematch && online.remoteRematch) hostStartOnline();
+    resultBots();
+  } else if (msg.t === "ping") online.net.send(Protocol.pong(msg.id, msg.ts));
+}
+
+function cryptoSeed() {
+  const a = new Uint32Array(1);
+  if (globalThis.crypto && crypto.getRandomValues) crypto.getRandomValues(a);
+  else a[0] = (Math.random() * 1e9) | 0;
+  return a[0] >>> 0;
+}
+
+function applyOnlineLooks(fighters) {
+  const you = CH.you, foe = CH.foe;
+  duel.fighters[0].color = you.body; duel.fighters[0].letterColor = you.letters; duel.fighters[0].sparkColor = you.body;
+  duel.fighters[1].color = foe.body; duel.fighters[1].letterColor = foe.letters;
+  const root = document.documentElement.style;
+  root.setProperty("--you", you.body);
+  root.setProperty("--you-letters", you.letters);
+  root.setProperty("--foe", foe.body);
+  renderer.chars = { keys: fighters, glows: [you.body, foe.body] };
+  renderer.menuSpar = fighters;
+}
+
+function startOnlineDuel(seed, hostFighter, guestFighter, hostName, guestName) {
+  clearRoomInput();
+  online.active = true;
+  online.screenState = "playing";
+  online.seed = seed >>> 0;
+  online.seq = 0;
+  online.snapN = 0;
+  online.snapNext = 0;
+  online.keyQueue = [];
+  online.trace = [];
+  online.localRematch = false;
+  online.remoteRematch = false;
+  online.hostSentResult = false;
+  online.waitingResult = null;
+  shownResult = false;
+  rec = null;
+  lastRecord = null;
+  traceNext = 0;
+  matchSpace = settings.wordSubmit;
+  bot = null;
+  botCfg = { name: online.role === "guest" ? hostName : guestName, beatAt: 0 };
+  duel.start(seed, ["medium", "medium"]);
+  if (online.role === "guest") duel.streams = [duel.streams[1], duel.streams[0]];
+  const localFighters = online.role === "guest" ? [guestFighter, hostFighter] : [hostFighter, guestFighter];
+  setPanelChar(0, localFighters[0], duel.typists[0].weapon);
+  setPanelChar(1, localFighters[1], duel.typists[1].weapon);
+  panels[0].name.textContent = "YOU";
+  panels[1].name.textContent = online.role === "guest" ? hostName : guestName;
+  applyOnlineLooks(localFighters);
+  view = new StreamView(duel.streams[0]);
+  modals = [];
+  renderModal();
+  showScreen(null);
+}
+
+function hostStartOnline() {
+  const peer = online.peerProfile || { name: "OPPONENT", fighter: CH.defaultChar };
+  const seed = cryptoSeed();
+  const hostFighter = safeChar(online.profile.fighter), guestFighter = safeChar(peer.fighter);
+  online.net.send(Protocol.start(seed, [hostFighter, guestFighter], ["PLAYER", peer.name], CONFIG.duel.countdown));
+  startOnlineDuel(seed, hostFighter, guestFighter, "PLAYER", peer.name);
+}
+
+function guestStartOnline(msg) {
+  startOnlineDuel(msg.seed, safeChar(msg.fighters[0]), safeChar(msg.fighters[1]), msg.names[0], msg.names[1]);
+}
+
+function toggleOnlineReady() {
+  online.localReady = !online.localReady;
+  if (online.net) online.net.send(Protocol.ready(online.localReady));
+  if (online.role === "host" && online.localReady && online.remoteReady) { hostStartOnline(); return; }
+  renderOnline();
+}
+
 function goMenu() {
+  if (online.net) online.net.close();
+  online.net = null;
+  resetOnlineState(true);
   modals = [];
   renderModal();
   duel.phase = "menu";
@@ -489,29 +741,51 @@ function accuracy(t) {
   return n ? Math.round((s.correct / n) * 100) + "%" : "-";
 }
 
+function onlineChart(you, foe) {
+  const W = 600, H = 64, data = online.trace;
+  if (data.length < 2) return `<div class="chart-head"><span>Online WPM over time</span><span>unranked</span></div><svg class="speed" viewBox="0 0 ${W} ${H}"></svg>`;
+  const top = Math.max(40, ...data.map((p) => Math.max(p[0], p[1])));
+  const max = Math.ceil(top / 20) * 20;
+  const line = (i) => data.map((p, k) => `${((k / (data.length - 1)) * W).toFixed(1)},${(H - (p[i] / max) * H).toFixed(1)}`).join(" ");
+  return `<div class="chart-head"><span>Online WPM over time, ${duel.t.toFixed(0)} s</span><span>` +
+    `<span class="key-i"><i style="background:${you}"></i>YOU</span><span class="key-i"><i style="background:${foe}"></i>${botCfg.name}</span></span></div>` +
+    `<svg class="speed" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="0" x2="${W}" y1="${H}" y2="${H}" stroke="${UI.line}" stroke-width="1"/>` +
+    `<polyline points="${line(1)}" fill="none" stroke="${foe}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>` +
+    `<polyline points="${line(0)}" fill="none" stroke="${you}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
+}
+
 function showResult() {
   showScreen("result");
   const youWon = duel.result.winner === 0;
   $("ko-title").className = youWon ? "win" : "lose";
   $("ko-title").textContent = youWon ? "YOU WIN" : "YOU LOSE";
   Sfx.play(youWon ? "win" : "lose");
-  $("ko-sub").textContent = `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (win at about ${Math.round(botCfg.beatAt)} WPM)`;
+  $("ko-sub").textContent = isOnlineMatch()
+    ? `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name}, unranked online`
+    : `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (win at about ${Math.round(botCfg.beatAt)} WPM)`;
   const col = (t, i, name) => `<div class="rcol panel" style="--id:var(${i ? "--foe" : "--you"})"><h3>${name}</h3><dl>
     <dt>Average WPM</dt><dd>${avgWpm(t)}</dd><dt>Accuracy</dt><dd>${accuracy(t)}</dd>
     <dt>Best combo</dt><dd>x${t.stats.bestCombo}</dd><dt>Ultimates landed</dt><dd>${t.stats.ultimates}</dd></dl></div>`;
   $("result-cols").innerHTML = col(duel.typists[0], 0, "YOU") + col(duel.typists[1], 1, botCfg.name);
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-  $("wpm-chart").innerHTML = StatsPage.resultChart(lastRecord, css("--you"), css("--foe"));
-  $("result-extra").innerHTML = StatsPage.resultExtra(lastRecord);
+  $("wpm-chart").innerHTML = isOnlineMatch() ? onlineChart(css("--you"), css("--foe")) : StatsPage.resultChart(lastRecord, css("--you"), css("--foe"));
+  $("result-extra").innerHTML = isOnlineMatch() ? `<div class="card-label"><span>Online</span><span>Private room</span></div><p class="modal-note">Online matches are unranked and are not saved to My stats.</p>` : StatsPage.resultExtra(lastRecord);
   resultBots();
 }
 
 function resultBots() {
-  $("result-bots").innerHTML = `<div class="card-label"><span>Pick another opponent</span><span>${botKeys()}</span></div>` +
-    BOTS.map((b, i) => `<button class="bot-chip pick ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1"><b>${b.name}</b>${Math.round(botCfgFor(i).beatAt)} wpm</button>`).join("");
-  $("result-btns").innerHTML = btn("rematch", "Rematch", "Enter", "primary") + btn("nextbot", "Next opponent", botKeys()) + btn("stats", "My stats", "T") + btn("menu", "Main menu", "Esc");
-  keyline([keyBtn("fighter", "C", "fighter"), keyBtn("howto", "H", "how to play"), keyBtn("settings", "S", "settings"),
-    keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+  if (isOnlineMatch()) {
+    $("result-bots").innerHTML = `<div class="card-label"><span>Online room</span><span>${online.localRematch ? "Waiting" : "Ready for rematch"}</span></div>` +
+      `<button class="bot-chip pick ${online.remoteRematch ? "sel" : ""}" tabindex="-1"><b>${botCfg.name}</b>${online.remoteRematch ? "wants rematch" : "not ready"}</button>`;
+    $("result-btns").innerHTML = btn("rematch", online.localRematch ? "Waiting" : "Rematch", "Enter", online.localRematch ? "" : "primary") + btn("menu", "Leave", "Esc");
+    keyline([keyBtn("settings", "S", "settings"), keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+  } else {
+    $("result-bots").innerHTML = `<div class="card-label"><span>Pick another opponent</span><span>${botKeys()}</span></div>` +
+      BOTS.map((b, i) => `<button class="bot-chip pick ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1"><b>${b.name}</b>${Math.round(botCfgFor(i).beatAt)} wpm</button>`).join("");
+    $("result-btns").innerHTML = btn("rematch", "Rematch", "Enter", "primary") + btn("nextbot", "Next opponent", botKeys()) + btn("stats", "My stats", "T") + btn("menu", "Main menu", "Esc");
+    keyline([keyBtn("fighter", "C", "fighter"), keyBtn("howto", "H", "how to play"), keyBtn("settings", "S", "settings"),
+      keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+  }
 }
 
 // ---------- Stats screen (js/stats-page.js draws it from the saved match records) ----------
@@ -534,7 +808,7 @@ function sizePreview() {
 }
 
 function openFighter() {
-  back = screen === "result" ? "result" : "title";
+  back = screen === "result" ? "result" : screen === "online" ? "online" : "title";
   pickIndex = Math.max(0, ROSTER.indexOf(charKey));
   showScreen("fighter");
   $("chars").innerHTML = ROSTER.map((k, i) => { const d = charDef(k); return `<button class="char pick" data-act="char:${i}" tabindex="-1"><b>${d.name}</b><span>${d.title}</span></button>`; }).join("");
@@ -568,7 +842,9 @@ function closeFighter(confirm) {
     try { localStorage.setItem(CH.storageKey, charKey); } catch (e) { /* not saved, still works */ }
     applyLooks();
   }
-  if (back === "result") { showScreen("result"); resultBots(); } else renderTitle();
+  if (back === "result") { showScreen("result"); resultBots(); }
+  else if (back === "online") { online.profile = onlineProfile(); renderOnline(); }
+  else renderTitle();
 }
 
 function openHowto() {
@@ -591,9 +867,12 @@ function renderModal() {
   m.dataset.top = top;
   if (top !== "settings") m.classList.remove("preview");
   if (top === "pause") {
-    $("mod-pause").innerHTML = `<h2 class="screen-title">Paused</h2>` +
-      mbtn("resume", "Resume", "Esc", "primary") + mbtn("restart", "Restart", "R") + mbtn("settings", "Settings", "S") + mbtn("quit", "Quit to menu", "Q") +
-      `<p class="modal-note">The fight is frozen: the clock, the bot and your typing all wait for you.</p>`;
+    $("mod-pause").innerHTML = isOnlineMatch()
+      ? `<h2 class="screen-title">Online</h2>` + mbtn("resume", "Close", "Esc", "primary") + mbtn("settings", "Settings", "S") + mbtn("quit-yes", "Leave room", "Q") +
+        `<p class="modal-note">Online fights keep running while this menu is open.</p>`
+      : `<h2 class="screen-title">Paused</h2>` +
+        mbtn("resume", "Resume", "Esc", "primary") + mbtn("restart", "Restart", "R") + mbtn("settings", "Settings", "S") + mbtn("quit", "Quit to menu", "Q") +
+        `<p class="modal-note">The fight is frozen: the clock, the bot and your typing all wait for you.</p>`;
   } else if (top === "confirm") {
     $("mod-confirm").innerHTML = `<h2 class="screen-title">Quit to menu?</h2><p>This fight ends without a result.</p>` +
       `<div class="btn-row">${btn("quit-no", "Keep fighting", "Esc", "primary")}${btn("quit-yes", "Quit", "Enter")}</div>`;
@@ -886,8 +1165,21 @@ function act(name) {
   Sfx.play("ui");
   const top = topModal();
   switch (a) {
-    case "play": case "rematch": begin(); break;
-    case "fighter": if (!top && (screen === "title" || screen === "result" || screen === "howto")) openFighter(); break;
+    case "play": begin(); break;
+    case "rematch":
+      if (isOnlineMatch()) {
+        online.localRematch = true;
+        if (online.net) online.net.send(Protocol.rematch(true));
+        if (online.role === "host" && online.remoteRematch) hostStartOnline();
+        resultBots();
+      } else begin();
+      break;
+    case "online": if (!top && screen === "title") openOnline(); break;
+    case "online-create": createOnlineRoom(); break;
+    case "online-join": joinOnlineRoom(); break;
+    case "online-ready": toggleOnlineReady(); break;
+    case "online-leave": goMenu(); break;
+    case "fighter": if (!top && (screen === "title" || screen === "result" || screen === "howto" || screen === "online")) openFighter(); break;
     case "howto": if (!top && (screen === "title" || screen === "result")) openHowto(); break;
     case "settings": openSettings(); break;
     case "fullscreen": setFullscreen(!isFullscreen()); break;
@@ -900,6 +1192,7 @@ function act(name) {
       else if (screen === "howto") closeHowto();
       else if (screen === "stats") { if (!StatsPage.back()) closeStats(); }
       else if (screen === "fighter") closeFighter(false);
+      else if (screen === "online") goMenu();
       break;
     case "confirm": closeFighter(true); break;
     case "prev": stepPick(-1); break;
@@ -956,15 +1249,25 @@ function menuKey(e) {
     else if (k === "Enter") act("play");
     return;
   }
+  if (screen === "online") {
+    if (k === "Escape") act(online.connected ? "online-leave" : "back");
+    else if (lower === "c" && !online.connected) act("online-create");
+    else if (lower === "j" && !online.connected) act("online-join");
+    else if (lower === "f" && !online.connected) act("fighter");
+    else if (k === "Enter" && online.connected) act("online-ready");
+    else if (k === "F2") { e.preventDefault(); act("view"); }
+    return;
+  }
   if (screen === "title" || screen === "result") {
     if (lower === "c") act("fighter");
     else if (lower === "h") act("howto");
     else if (lower === "t") act("stats");
+    else if (lower === "o" && screen === "title") act("online");
     else if (lower === "s") act("settings");
     else if (lower === "f") act("fullscreen");
     else if (k === "F2") { e.preventDefault(); act("view"); }
     else if (k >= "1" && k <= String(BOTS.length)) act("bot:" + (+k - 1));
-    else if (k === "Enter") act("play");
+    else if (k === "Enter") act(screen === "result" ? "rematch" : "play");
     else if (k === "Escape" && screen === "result") act("menu");
   }
 }
@@ -990,6 +1293,28 @@ function modalKey(top, e) {
     else if (k === "ArrowLeft") stepValue(-1);
     else if (k === "ArrowRight" || k === "Enter") stepValue(1);
   }
+}
+
+function applyInputToSide(side, key) {
+  const s = duel.streams && duel.streams[side];
+  if (!s) return [];
+  if (key === "Backspace") { s.backspace(); return []; }
+  if (key === "Submit") return s.submit(true);
+  if (key === "AutoSubmit") return s.submit(false);
+  if (key && key.length === 1) return s.press(key);
+  return [];
+}
+
+function queueOnlineKey(key) {
+  if (!online.active || online.role !== "guest") return;
+  online.keyQueue.push({ k: key, lt: duel.t });
+  if (online.keyQueue.length >= CONFIG.net.maxKeysPerMessage) flushOnlineKeys();
+}
+
+function flushOnlineKeys() {
+  if (!online.net || online.role !== "guest" || !online.keyQueue.length) return;
+  const batch = online.keyQueue.splice(0, CONFIG.net.maxKeysPerMessage);
+  online.net.send(Protocol.keys(online.seq++, batch));
 }
 
 function handlePlayerTyping(evs) {
@@ -1022,30 +1347,32 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Backspace" || e.key === " " || e.key === "Enter" || e.key === "Tab" || e.key.length === 1) e.preventDefault();
   if (duel.phase !== "fight") return; // countdown: keys are ignored
 
-  if (e.key === "Backspace") { duel.streams[0].backspace(); view.update(); return; }
+  if (e.key === "Backspace") { applyInputToSide(0, "Backspace"); queueOnlineKey("Backspace"); view.update(); return; }
   // What the player does is also noted by the recorder (stats only; it reads the stream, never changes it).
   if (e.key === " " || e.key === "Enter") {
     const s = duel.streams[0];
-    rec.space(duel.t, s.typed, s.current().text);
-    const evs = s.submit(true);
-    rec.events(evs);
+    if (rec) rec.space(duel.t, s.typed, s.current().text);
+    const evs = applyInputToSide(0, "Submit");
+    queueOnlineKey("Submit");
+    if (rec) rec.events(evs);
     handlePlayerTyping(evs);
     return;
   }
   if (e.key.length === 1) {
     const s = duel.streams[0], w = s.current(), ch = e.key.toLowerCase();
-    if (s.typed.length < w.text.length + 5) rec.press(duel.t, w.text[s.typed.length], ch);
-    const evs = s.press(ch);
+    if (rec && s.typed.length < w.text.length + 5) rec.press(duel.t, w.text[s.typed.length], ch);
+    const evs = applyInputToSide(0, ch);
+    queueOnlineKey(ch);
     // "Space ends a word" off: an exactly typed word ends by itself, with no key counted for the missing Space.
-    if (!matchSpace && s.autoEnds()) evs.push(...s.submit(false));
-    rec.events(evs);
+    if (!matchSpace && s.autoEnds()) { evs.push(...applyInputToSide(0, "AutoSubmit")); queueOnlineKey("AutoSubmit"); }
+    if (rec) rec.events(evs);
     handlePlayerTyping(evs);
   }
 });
 
 // Leaving the browser tab (or the window) pauses the fight.
-document.addEventListener("visibilitychange", () => { if (document.hidden) openPause(); });
-window.addEventListener("blur", openPause);
+document.addEventListener("visibilitychange", () => { if (document.hidden && !isOnlineMatch()) openPause(); });
+window.addEventListener("blur", () => { if (!isOnlineMatch()) openPause(); });
 
 // ---------- HUD ----------
 function clock(t) {
@@ -1149,6 +1476,26 @@ let last = performance.now(), acc = 0;
 const frameStats = { n: 0, ms: 0 }; // average cost of draw + HUD per frame (for tests)
 const perf = { frames: 0, ms: 0, since: performance.now() }; // for the FPS counter (Graphics > Show FPS)
 let nextDraw = 0;                                              // frame rate limit: when the next frame may be drawn
+function onlineTick() {
+  if (!online.active) return;
+  if (online.role === "guest" && online.keyQueue.length && duel.t >= online.keyFlushAt) {
+    flushOnlineKeys();
+    online.keyFlushAt = duel.t + CONFIG.net.keyBatchMs / 1000;
+  }
+  if (online.role === "host" && online.net && duel.phase !== "menu" && duel.t >= online.snapNext) {
+    online.net.send(Protocol.state(online.snapN++, duel.snapshot()));
+    online.snapNext = duel.t + 1 / CONFIG.net.snapshotHz;
+  }
+  if (online.role === "host" && duel.phase === "fight" && duel.t >= traceNext) {
+    online.trace.push([duel.wpmNow[0], duel.wpmNow[1], duel.typists[0].hp, duel.typists[1].hp]);
+    traceNext += 0.5;
+  }
+  if (online.role === "host" && duel.phase === "over" && duel.result && !online.hostSentResult) {
+    online.hostSentResult = true;
+    online.net.send(Protocol.result(duel.result.winner, duel.t, duel.typists.map((t) => t.stats)));
+  }
+}
+
 function loop(now) {
   // Frame rate limit (Graphics tab): skip a display frame instead of drawing it. The simulation keeps its own fixed
   // step, so skipping frames never changes how a fight plays.
@@ -1162,7 +1509,8 @@ function loop(now) {
   last = now;
   const t0 = performance.now();
   const frozen = paused();
-  if (duel.phase !== "menu" && !frozen) {
+  const remoteView = online.active && online.role === "guest";
+  if (duel.phase !== "menu" && !frozen && !remoteView) {
     acc += dt;
     while (acc >= STEP) {
       if (bot && duel.phase === "fight") bot.update(duel.t);
@@ -1177,15 +1525,26 @@ function loop(now) {
     if (view) view.sync();
   } else {
     acc = 0;
+    if (remoteView && view) view.sync();
   }
+  onlineTick();
   if (duel.phase === "over" && !shownResult && duel.fighters.some((f) => f.dead && f.state === "down" && f.stateT > 0.6)) {
     shownResult = true;
     resultShownAt = performance.now();
-    rec.sample(duel);
-    lastRecord = rec.finish(duel);
-    if (!Stats.add(lastRecord)) toast("This match could not be saved to your stats: the browser's storage is full or blocked.");
-    const mine = avgWpm(duel.typists[0]);
-    if (mine > 0 && duel.t > 5) saveHistory(mine); // for MATCH ME
+    if (rec) {
+      rec.sample(duel);
+      lastRecord = rec.finish(duel);
+      if (!Stats.add(lastRecord)) toast("This match could not be saved to your stats: the browser's storage is full or blocked.");
+      const mine = avgWpm(duel.typists[0]);
+      if (mine > 0 && duel.t > 5) saveHistory(mine); // for MATCH ME
+    }
+    if (isOnlineMatch()) online.screenState = "result";
+    showResult();
+  }
+  if (online.waitingResult && !shownResult && duel.phase === "over") {
+    shownResult = true;
+    resultShownAt = performance.now();
+    online.screenState = "result";
     showResult();
   }
   if (duel.phase !== "over") shownResult = false;
