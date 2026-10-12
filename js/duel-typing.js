@@ -63,6 +63,15 @@ class TypingStream {
   backspace() {
     if (this.typed.length) this.typed = this.typed.slice(0, -1);
   }
+
+  // "Space ends a word" off: a word ends by itself the moment it is typed exactly right (the caller then calls
+  // submit(false), no key is counted for the missing Space). A word with a wrong letter in it is not exact, so it
+  // still needs Space (or Backspace and a fix). The words per minute are the same either way: with Space off you
+  // press one key less per word, and the credit for that missing Space is not given.
+  autoEnds() {
+    const w = this.current();
+    return this.typed.length > 0 && this.typed === w.text;
+  }
 }
 
 // A weapon from CONFIG.weapons with every field filled in: anything it leaves out comes from the

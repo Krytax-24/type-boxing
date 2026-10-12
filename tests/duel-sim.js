@@ -197,6 +197,25 @@ function soloWpm(g, cfg, secs) {
   const s = d.typists[0].stats; return s.correct / 5 / ((s.lastKeyAt - s.firstKeyAt) / 60);
 }
 const g = load();
+
+console.log("Typing: Space ends a word off (auto-end)");
+{
+  const src = { n: 0, next() { return "alpha"; } };
+  const st = new g.TypingStream(src);
+  for (const ch of "alph") st.press(ch);
+  check("a half typed word does not auto-end", !st.autoEnds());
+  st.press("a");
+  check("an exactly typed word auto-ends", st.autoEnds());
+  const ev = st.submit(false);
+  check("auto-end counts no phantom Space key", !ev.some((e) => e.type === "correct" || e.type === "wrong") && ev.some((e) => e.type === "word" && e.clean));
+  const st2 = new g.TypingStream(src);
+  for (const ch of "alphx") st2.press(ch);
+  check("a full length word with a typo does not auto-end", !st2.autoEnds());
+  st2.backspace(); st2.press("a");
+  check("fixing the typo lets it auto-end, but the word is not clean", st2.autoEnds() && !st2.submit(false).find((e) => e.type === "word").clean);
+  const st3 = new g.TypingStream(src);
+  check("an empty word never auto-ends", !st3.autoEnds());
+}
 const matchBot = (target) => { const M = g.CONFIG.duel.matchMe; const c = Object.assign({}, M, { beatAt: target }); c.wpm = g.Bot.rawWpmFor(target, c); return c; };
 const calBots = g.CONFIG.duel.bots.concat([Object.assign(matchBot(50), { name: "MATCH ME 50" }), Object.assign(matchBot(90), { name: "MATCH ME 90" })]);
 if (NC > 0) {
