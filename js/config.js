@@ -211,12 +211,26 @@ const CONFIG = {
     uiMinScale: 0.7, uiMaxScale: 2.5,
   },
 
-  // Player settings, saved in localStorage. The view keeps its own key (wordPlate.storageKey).
+  // Player settings, saved in localStorage. The view keeps its own key (wordPlate.storageKey). All of them are
+  // visual or about input: none changes a rule. Themes, the background and custom CSS have their own keys (js/themes.js).
   settings: {
     storageKey: "typeboxing.settings",
-    defaults: { reduceMotion: false, shake: 1, damageNumbers: true, sound: true, volume: 0.7, wordSubmit: true },
-    shakeSteps: [[0, "Off"], [0.5, "Low"], [1, "Normal"], [1.5, "Strong"]],
+    defaults: {
+      reduceMotion: false, shake: 1, damageNumbers: true, sound: true, volume: 0.7, wordSubmit: true,
+      renderScale: 0, sceneryLevel: "full", uiScale: 1, hudOpacity: 0.9,
+      showWpm: true, showPower: true, showEdge: true,
+      fxSparks: true, fxSmears: true, fxAfterimages: true, fxDust: true, fxGlow: true, fxBudget: 400,
+      scanlines: true, sweep: true, flash: true, hitstop: true,
+      showFps: false, frameCap: 0,
+    },
+    shake: { min: 0, max: 2, step: 0.1 },               // screen shake intensity slider (0 = none, 1 = normal, 2 = double)
+    hudOpacity: { min: 0.4, max: 1, step: 0.05 },
     volumeSteps: [[0.3, "Low"], [0.5, "Medium"], [0.7, "High"], [1, "Max"]],
+    renderScaleSteps: [[0.5, "50%"], [0.75, "75%"], [1, "100%"], [0, "Native"]], // 0 = every pixel the display has
+    scenerySteps: [["full", "Full"], ["simple", "Simple"], ["off", "Off"]],
+    uiScaleSteps: [[0.85, "85%"], [1, "100%"], [1.15, "115%"], [1.3, "130%"]],
+    budgetSteps: [[100, "Low"], [200, "Medium"], [400, "High"], [800, "Max"]],
+    frameCapSteps: [[0, "None"], [60, "60"], [120, "120"], [144, "144"]],
   },
 
   // Word plates: each typist's current word floats over their own fighter.

@@ -157,6 +157,7 @@ js/duel-typing.js  TypingStream (Monkeytype engine), Typist (wpm, combo, charge)
 js/duel.js         Duel: the rules and the world the renderer draws. No keyboard, no DOM.
 js/render.js       Renderer: canvas drawing and stickman poses, never changes game state
 js/fighter.js      Fighter: position and animation state of one stick figure (shared with the sandbox)
+js/themes.js, js/stats.js, js/stats-page.js   see "Themes, settings and stats" below
 js/main.js         keyboard and mouse (act()), the Bot, typing box view, HUD, screens, pause and settings modals, full screen layout (resize())
 ```
 
@@ -229,6 +230,23 @@ The roster is Krishna's six designed characters (concept art in `C:\Users\krish\
 - Keys added: U sound on or off; any attack key in the air does the air attack; V now has three pages (movement, attacks, reactions and idle breaks).
 - Checked with the designed characters (all six): scripted runs of every scenario (locomotion, jumps, turns, dashes, attacks and combos, reactions, air and running attacks, idle breaks, death): no NaN, no sole below the floor, largest joint jump 37 units a step inside strikes, zero console errors; every key in the live page; chaining verified (a buffered attack starts at the first one's cancel window, about halfway through); lineup renders compared with the concept art; about 0.95 ms a frame.
 - Checked after the Tekken 3 restyle, the orb and the four-arm pass (all six): every scenario, no NaN, no sole below the floor, largest joint jump 37 units a step inside strikes, zero console errors; the orb never goes below the floor and stays finite in every clip and in locomotion; chaining verified on all six (a press during a long multi-hit attack is now buffered 0.7 s); every key in the live page; about 1.5 ms a frame (the faceted shading costs about 0.5 ms).
+
+## Themes, settings and stats (added October 2026)
+
+New files, all optional layers that never touch the rules:
+
+```
+js/themes.js       Themes: 11 color slots derive every UI, arena, fighter and plate color (build()); presets, share code "TB1.", background image (URL or file in IndexedDB), custom CSS (?nocss for safe mode). Mutates CONFIG.theme.* in place and mirrors CSS variables on :root.
+js/stats.js        Stats: Recorder (reads the typing stream and the duel, writes nothing back), match records in localStorage "typeboxing.records" (newest 500), summaries.
+js/stats-page.js   StatsPage: the "My stats" screen and the result chart/extras, plain SVG and DOM.
+```
+
+- Storage keys: `typeboxing.theme`, `.bg` (+ IndexedDB "typeboxing"/"files"/"bg"), `.css`, `.settings`, `.records`, plus the older `.view`, `.char`, `.history`.
+- Settings (main.js `SETTINGS_TABS`: Game, Typing, Graphics, Sound, Theme, Custom, Keys) are data driven rows (seg, range, button, head, note). Defaults and step tables are in `CONFIG.settings`. Theme and Custom tabs use `#modal.preview` so the screen behind stays visible.
+- Screen shake: `settings.shake` (0 to 150 percent) feeds `renderer.shakeScale` and the fighter effects; Reduce motion forces 0. "Shake now" calls `renderer.kick()`.
+- Typing mode: "Space ends a word" off means an exactly typed word ends by itself (`TypingStream.autoEnds()` then `submit(false)`, no phantom Space key, so WPM is not inflated). A typo'd word still needs Space. The mode is stored per match record (`space` or `auto`).
+- Themes, drawing, input and stats never change game state. Balance numbers stay in `config.js`.
+- Light themes work because the CSS is tokenized; every preset keeps main text at 4.5:1 or better against its background.
 
 ## Build order
 
