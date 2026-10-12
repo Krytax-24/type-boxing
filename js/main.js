@@ -586,7 +586,7 @@ function onlineStatus(e) {
   online.code = e.code || online.code;
   online.role = e.role || online.role;
   if (e.state === "waiting") online.status = "Share the code with your opponent.";
-  else if (e.state === "joining") online.status = "Joining room...";
+  else if (e.state === "joining") online.status = e.message || "Joining room...";
   else if (e.state === "connected") {
     online.connected = true;
     online.status = "Connected. Ready up when both players are here.";
