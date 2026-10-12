@@ -55,12 +55,39 @@ const CONFIG = {
   net: {
     enabled: true,
     server: { host: null, port: null, path: null, secure: null },
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    // Optional TURN REST endpoint. Example:
+    // "https://YOUR_APP.metered.live/api/v1/turn/credentials?apiKey=YOUR_KEY"
+    turnApiUrl: "https://typeboxing.metered.live/api/v1/turn/credentials?apiKey=a0b0207d3f018380e8e8000cf7a8c3d9b80e",
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun.relay.metered.ca:80" },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "53a78e8c289530c70856ce95",
+        credential: "75d8t/aIZUqn66Yu",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "53a78e8c289530c70856ce95",
+        credential: "75d8t/aIZUqn66Yu",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "53a78e8c289530c70856ce95",
+        credential: "75d8t/aIZUqn66Yu",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "53a78e8c289530c70856ce95",
+        credential: "75d8t/aIZUqn66Yu",
+      },
+    ],
     roomCodeLength: 5,
     roomCodeAlphabet: "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
     peerIdPrefix: "typeboxing-",
     snapshotHz: 20,
     pingEverySec: 2,
+    connectTimeoutSec: 12,
     reconnectGraceSec: 15,
     maxMessageBytes: 4096,
     maxKeysPerMessage: 64,
