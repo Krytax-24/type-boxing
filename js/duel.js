@@ -382,4 +382,82 @@ class Duel {
     a.shownHp += n;
     this.number(i, n, now);
   }
+
+  snapshot() {
+    const stream = (s) => ({
+      index: s.index, typed: s.typed, wordErrors: s.wordErrors,
+      words: s.words.slice(s.index, s.index + 8).map((w) => ({
+        text: w.text, ultimate: !!w.ultimate, clean: w.clean, typedFinal: w.typedFinal || "",
+      })),
+    });
+    const fighter = (f) => ({
+      x: f.x, z: f.z, vx: f.vx, vz: f.vz, facing: f.facing, kx: f.kx || 0,
+      state: f.state, stateT: f.stateT, stun: f.stun, move: f.move, moveT: f.moveT,
+      hitsDone: f.hitsDone, moveCount: f.moveCount, flashT: f.flashT, dead: !!f.dead,
+      counterHit: !!f.counterHit, ult: f.ult ? { clean: !!f.ult.clean, fired: !!f.ult.fired, sparks: f.ult.sparks || 0 } : null,
+    });
+    return {
+      t: this.t, phase: this.phase, countdown: this.countdown, goFlash: this.goFlash,
+      hp: this.typists.map((x) => x.hp), streak: this.typists.map((x) => x.streak),
+      combo: this.typists.map((x) => x.comboLevel), charge: this.typists.map((x) => x.charge),
+      stunUntil: this.typists.map((x) => x.stunUntil), counterUntil: this.typists.map((x) => x.counterUntil),
+      wpm: this.wpmNow.slice(), power: this.power.slice(),
+      stats: this.typists.map((x) => Object.assign({}, x.stats)),
+      fighters: this.fighters.map(fighter), streams: this.streams.map(stream),
+      fx: this.fx.slice(-12).map((x) => Object.assign({}, x)),
+      shake: this.shake, flash: this.flash, result: this.result ? Object.assign({}, this.result) : null,
+    };
+  }
+
+  applySnapshot(s, mirror) {
+    const map = mirror ? [1, 0] : [0, 1];
+    this.t = s.t;
+    this.phase = s.phase;
+    this.countdown = s.countdown || 0;
+    this.goFlash = s.goFlash || 0;
+    this.shake = s.shake || 0;
+    this.flash = s.flash || 0;
+    this.result = s.result ? Object.assign({}, s.result) : null;
+    if (mirror && this.result && typeof this.result.winner === "number") this.result.winner = 1 - this.result.winner;
+    for (let local = 0; local < 2; local++) {
+      const remote = map[local], typ = this.typists[local], src = s.streams && s.streams[remote];
+      typ.hp = s.hp[remote];
+      typ.streak = s.streak ? s.streak[remote] : typ.streak;
+      typ.comboLevel = s.combo ? s.combo[remote] : typ.comboLevel;
+      typ.charge = s.charge ? s.charge[remote] : typ.charge;
+      typ.stunUntil = s.stunUntil ? s.stunUntil[remote] : typ.stunUntil;
+      typ.counterUntil = s.counterUntil ? s.counterUntil[remote] : typ.counterUntil;
+      if (s.stats && s.stats[remote]) typ.stats = Object.assign(typ.stats, s.stats[remote]);
+      this.wpmNow[local] = s.wpm ? s.wpm[remote] : 0;
+      this.power[local] = s.power ? s.power[remote] : 0;
+      if (src && this.streams[local] && !(mirror && local === 0)) {
+        const st = this.streams[local];
+        st.index = src.index;
+        st.typed = src.typed || "";
+        st.wordErrors = src.wordErrors || 0;
+        for (let k = 0; k < src.words.length; k++) st.words[src.index + k] = Object.assign({}, src.words[k]);
+        if (st.words.length - st.index < 20) st.extend();
+      }
+      const rf = s.fighters && s.fighters[remote], f = this.fighters[local];
+      if (rf && f) {
+        Object.assign(f, rf);
+        if (mirror) {
+          f.x = this.arenaWidth - rf.x;
+          f.vx = -rf.vx;
+          f.kx = -(rf.kx || 0);
+          f.facing = -rf.facing;
+        }
+      }
+    }
+    this.fx = (s.fx || []).map((fx) => {
+      const o = Object.assign({}, fx);
+      if (mirror && typeof o.owner === "number") {
+        o.owner = 1 - o.owner;
+        if (typeof o.x === "number") o.x = this.arenaWidth - o.x;
+        if (o.align === "left") o.align = "right";
+        else if (o.align === "right") o.align = "left";
+      }
+      return o;
+    });
+  }
 }
