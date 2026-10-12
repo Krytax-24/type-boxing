@@ -16,7 +16,7 @@ const DuelChars = (() => {
   const snd = (stage, name, k) => { if (stage.audible && typeof Sfx !== "undefined") Sfx.play(name, k); };
 
   // The sound of a hit comes from the drawn weapon (a whip on sword moves, pistols on bare-hand moves).
-  const DRAW_SOUND = { cyberSword: "slash", katana: "slash", whip: "whip", bat: "bat", staff: "staff", axe: "axe", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
+  const DRAW_SOUND = { cyberSword: "slash", katana: "slash", daggerLash: "whip", bat: "bat", staff: "staff", axe: "axe", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
   const hitSound = (def) => DRAW_SOUND[def.weaponDraw] || "punch";
   const defOf = (key) => Chars.DEFS[key] || Chars.DEFS[Chars.ORDER[0]];
 
@@ -83,7 +83,9 @@ const DuelChars = (() => {
       this.freeze = 0;     // a short hit-stop on the puppets only
       this.shake = 0;
       this.audible = !!opt.audible;
-      this.judge = null;   // (attacker) -> "hit" | "block" | null; null: no reaction
+      this.judge = null;   // (attacker) -> "hit" | "block" | "clash" | null; null: no reaction
+      this.strength = null; // (attacker) -> 0..1, how far apart the powers are (scales sparks, shake, freeze)
+      this.onHit = null;   // (attacker, verdict, strength): tells the rules side that a strike landed (visual only)
     }
 
     setPuppets(specs) {
@@ -176,8 +178,20 @@ const DuelChars = (() => {
       const reach = (Anim.W[p.ch.weapon] || {}).reach || 120;
       const verdict = o && !o.ch.dead && Math.abs(o.ch.x - p.ch.x) < reach + 140 && this.judge ? this.judge(p) : null;
       if (!verdict) { this.sparks(q[0], q[1], 3, p.trail, 0.5); snd(this, "whoosh", 0); return; }
+      const k = this.strength ? this.strength(p) : 0.5;
+      if (this.onHit) this.onHit(p, verdict, k);
       const ox = o.ch.x, px = c && c.orb ? (p.ch.facing > 0 ? Math.min(q[0], ox) : Math.max(q[0], ox)) : q[0];
       const hx = lerp(px, ox, 0.4), hy = Math.min(q[1], -50);
+      if (verdict === "clash") {
+        // Equal power: the two weapons meet in the middle. Nobody wins the exchange, nobody is staggered.
+        const mx = (px + ox) / 2;
+        this.star(mx, hy);
+        this.sparks(mx, hy, 6, p.trail, 0.8);
+        this.freeze = Math.max(this.freeze, 0.04);
+        this.shake = Math.max(this.shake, 1.5);
+        snd(this, "parry");
+        return;
+      }
       if (verdict === "block") {
         // The defender's power holds: a parry, unless it is in the middle of its own attack (then a clash).
         if (!o.ult && canAct(o.ch) && !(o.ch.action && o.ch.action.c.react)) startClip(o, "parry", 1.4);
@@ -197,8 +211,8 @@ const DuelChars = (() => {
       if (p.ch.weapon === "flame") { this.fire(hx, hy, 12 + 6 * big, p.ch.facing); p.heat = 1; }
       if (draw === "axe") this.ice(hx, hy, 8 + 6 * big);
       if (draw === "warHammer") { this.ring(hx, 70 + 30 * big, 0.45); this.dust(hx, 5 + 4 * big, 60, 0); }
-      this.freeze = Math.max(this.freeze, 0.04 + 0.03 * big);
-      this.shake = Math.max(this.shake, 2 + 2.5 * big);
+      this.freeze = Math.max(this.freeze, 0.03 + 0.03 * big + 0.03 * k);
+      this.shake = Math.max(this.shake, 1.5 + 2.5 * big + 2 * k);
       snd(this, hitSound(p.def), big / 2);
       if (draw !== "pistols") snd(this, "hurt");
     }
@@ -209,6 +223,7 @@ const DuelChars = (() => {
       for (const [i, p] of this.p.entries()) {
         const ch = p.ch, prevClip = ch.action ? ch.action.c : null, prevU = ch.action ? ch.action.u : 0, prevX = ch.x;
         ch.update(dt, inputs ? inputs[i] : {}, (c, name) => this.event(c.pup, name));
+        if (this.after) this.after(p, i, ch);   // Brawl: the rules decide where a fighter is
         if (p.ult && !ch.action) p.ult = false;
         if (!ch.action) p.fin = false;
         p.flash = Math.max(0, p.flash - dt);
@@ -369,8 +384,12 @@ const DuelChars = (() => {
       if (p.ult) return "hit";
       const i = p.side;
       if (duel.fighters[1 - i].dead) return "hit";
-      return duel.power[i] - duel.power[1 - i] > 0.5 ? "hit" : "block";
+      const net = duel.power[i] - duel.power[1 - i], band = duelTune("clashBand");
+      return net > band ? "hit" : net < -band ? "block" : "clash";
     };
+    duelStage.strength = (p) => Math.min(1, Math.abs(duel.power[p.side] - duel.power[1 - p.side]) / duelTune("tugRange"));
+    duelStage.onHit = (p, verdict, k) => duel.hitLanded(p.side, verdict, k);
+    duel.puppetHits = true;
   }
 
   function driveDuel(duel, now) {
@@ -469,6 +488,7 @@ const DuelChars = (() => {
   // ---------- The Fighter screen: one fighter shows off its random combos ----------
   const previewStage = new Stage({ audible: false });
   let previewKey = "", previewT = 0, previewN = 0;
+  const resetPreview = () => { previewKey = null; };
   function drawPreview(canvas, key, dt, reduceMotion) {
     if (previewKey !== key) {
       previewKey = key; previewT = 0.9; previewN = 0;
@@ -505,5 +525,5 @@ const DuelChars = (() => {
     return k;
   }
 
-  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, botKey, defOf, duelStage, sparStage, previewStage, setFx, FXO };
+  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, resetPreview, botKey, defOf, duelStage, sparStage, previewStage, setFx, FXO };
 })();

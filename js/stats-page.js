@@ -270,7 +270,7 @@ const StatsPage = (() => {
         const j = JSON.parse(t), n = Stats.importList(Array.isArray(j) ? j : j.matches);
         toast(n ? `Imported ${n} ${n === 1 ? "match" : "matches"}.` : "Nothing new to import.");
         render();
-      }).catch(() => toast("That file is not a Type Boxing stats file."));
+      }).catch(() => toast("That file is not a CounterType stats file."));
     });
   }
   function open(root, id) {

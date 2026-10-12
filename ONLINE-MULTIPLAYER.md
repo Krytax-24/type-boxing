@@ -346,3 +346,8 @@ Open the game twice in two tabs (or one normal and one private window), create a
 | LAN play from `file://` | Allowed only with an explicit `?server=host:port` |
 
 Docs and in-game text follow the project style: plain, concise prose, no em dashes or en dashes.
+
+
+## Lag notes (current design)
+
+The guest sends every key the moment it is typed. The host sends a snapshot 30 times a second on the real clock and one more right after any key from either player (at most every 33 ms). The snapshot carries only the host's word stream (4 words), rounded numbers, and the stats block only every 10th snapshot and at the end (about 1.4 KB). Between snapshots the guest advances clocks, effects, fighter timers and air physics itself (`Duel.advanceRemote`) and eases fighter positions toward the host's. A ping every 2 seconds drives the ping badge. What is left is the real round trip time; a TURN relay far from both players makes it worse.
