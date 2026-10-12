@@ -1,7 +1,7 @@
 // Small JSON message helpers for private-room multiplayer. Pure JS: no DOM, no PeerJS.
 (function (global) {
   const V = 1;
-  const TYPES = new Set(["hello", "welcome", "ready", "start", "keys", "state", "result", "ping", "pong", "rematch", "leave", "busy", "error"]);
+  const TYPES = new Set(["hello", "welcome", "ready", "start", "keys", "bin", "state", "result", "ping", "pong", "rematch", "leave", "busy", "error"]);
   const KEYS = new Set(["Backspace", "Submit", "AutoSubmit"]);
 
   const cleanName = (name) => {
@@ -25,6 +25,8 @@
   });
   const keyEvent = (e) => e && typeof e === "object" && num(e.lt, 0, 60 * 60) &&
     ((str(e.k, 1) && e.k.length === 1) || KEYS.has(e.k));
+  const rulesOk = (r) => r && typeof r === "object" && Number.isInteger(r.rounds) && r.rounds >= 1 && r.rounds <= 5 &&
+    [0, 30, 45, 60, 120].includes(r.timer) && bool(r.endless) && ["on", "off", "mix"].includes(r.words);
   const snapshot = (s) => s && typeof s === "object" && num(s.t, 0, 60 * 60) && str(s.phase, 16) &&
     Array.isArray(s.hp) && s.hp.length === 2 && s.hp.every((x) => num(x, 0, 1000));
 
@@ -41,12 +43,18 @@
         if (!uint(msg.seed) || !Array.isArray(msg.fighters) || msg.fighters.length !== 2 || !msg.fighters.every((x) => str(x, 24))) return null;
         if (!Array.isArray(msg.names) || msg.names.length !== 2 || !msg.names.every((x) => str(x, 16))) return null;
         if (!num(msg.countdown, 0, 10)) return null;
+        if (msg.game !== undefined && msg.game !== "typing" && msg.game !== "brawl") return null;
+        if (!uint(msg.mid) || !rulesOk(msg.rules) || !Number.isInteger(msg.round) || msg.round < 1 || msg.round > 99 ||
+          !Array.isArray(msg.wins) || msg.wins.length !== 2 || !msg.wins.every((x) => Number.isInteger(x) && x >= 0 && x <= 99)) return null;
+        break;
+      case "bin": // the guest's buttons in a Brawl fight: a bit mask (see js/brawl.js)
+        if (!uint(msg.n) || !Number.isInteger(msg.m) || msg.m < 0 || msg.m > 8191) return null;
         break;
       case "keys":
         if (!uint(msg.seq) || !Array.isArray(msg.events) || msg.events.length > ((cfg && cfg.maxKeysPerMessage) || 64) || !msg.events.every(keyEvent)) return null;
         break;
       case "state":
-        if (!uint(msg.n) || !snapshot(msg.s)) return null;
+        if (!uint(msg.n) || !uint(msg.mid) || !snapshot(msg.s)) return null;
         break;
       case "result":
         if (!(msg.winner === 0 || msg.winner === 1) || !num(msg.time, 0, 60 * 60)) return null;
@@ -71,9 +79,12 @@
     hello: (p) => Object.assign({ t: "hello", v: V }, profile(p)),
     welcome: (p) => Object.assign({ t: "welcome", v: V }, profile(p)),
     ready: (ready) => ({ t: "ready", v: V, ready: !!ready }),
-    start: (seed, fighters, names, countdown) => ({ t: "start", v: V, seed: seed >>> 0, fighters, names, countdown }),
+    // rules: { rounds, timer, endless, words }; round: 1 for a new match; wins: [host, guest] round wins so far;
+    // game: "typing" or "brawl". mid: counts the rounds this room has started, so a late state message of the last round is never applied to the next.
+    start: (seed, fighters, names, countdown, rules, round, wins, mid, game) => ({ t: "start", v: V, game: game === "brawl" ? "brawl" : "typing", mid: (mid || 0) >>> 0, seed: seed >>> 0, fighters, names, countdown, rules: rules || { rounds: 1, timer: 0, endless: false, words: "mix" }, round: round || 1, wins: wins || [0, 0] }),
+    bin: (n, m) => ({ t: "bin", v: V, n: n >>> 0, m: m & 8191 }),
     keys: (seq, events) => ({ t: "keys", v: V, seq: seq >>> 0, events }),
-    state: (n, s) => ({ t: "state", v: V, n: n >>> 0, s }),
+    state: (n, s, mid) => ({ t: "state", v: V, n: n >>> 0, mid: (mid || 0) >>> 0, s }),
     result: (winner, time, stats) => ({ t: "result", v: V, winner, time, stats: stats || null }),
     ping: (id, ts) => ({ t: "ping", v: V, id: id >>> 0, ts }),
     pong: (id, ts) => ({ t: "pong", v: V, id: id >>> 0, ts }),

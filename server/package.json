@@ -1,0 +1,10 @@
+{
+  "name": "type-boxing-peer-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PeerJS introducer server for Type Boxing online play",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "peer": "^1.0.2" }
+}

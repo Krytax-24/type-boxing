@@ -233,7 +233,7 @@ const Chars = (() => {
 
   // ---------------- The five newer characters (from the later design sheets) ----------------
   DEFS.veil = {
-    key: "veil", name: "CRIMSON VEIL", title: "Masked whip duelist", gender: "F", weapon: "sword", weaponDraw: "whip",
+    key: "veil", name: "CRIMSON VEIL", title: "Dagger-lash duelist", gender: "F", weapon: "lash", weaponDraw: "daggerLash",
     body: { torso: 52, headR: 10, neck: 8.6, upper: 25, fore: 24, thigh: 40, shin: 39, foot: 10.4, limb: [8.4, 7.2, 12.2, 9],
       front: [5, 3, 6.8, 4.4], back: [7.4, 3.2, 4.6, 5], neckW: 5.8 },
     style: { speedK: 1.04, tempo: 0.9, sway: 2.4 },
@@ -506,17 +506,20 @@ const Chars = (() => {
     return S.J.hip;
   }
   function makeCloth(def) {
-    return def.cloth.map((c) => ({ c, ch: new Rig.Chain(c.n, c.seg, { gravity: c.gravity !== undefined ? c.gravity : 800, flutter: c.flutter || 80,
+    const cloth = def.cloth.map((c) => ({ c, ch: new Rig.Chain(c.n, c.seg, { gravity: c.gravity !== undefined ? c.gravity : 800, flutter: c.flutter || 80,
       damp: c.damp || 0.95, phase: c.phase || 0, wind: c.wind || (c.kind === "cape" ? 1.2 : c.kind === "hair" || c.kind === "braid" ? 0.25 : 0.6) }) }));
+    if (def.weaponDraw === "daggerLash") cloth.rope = Rig.newRope(); // Crimson Veil's lash is a real rope
+    return cloth;
   }
   function stepCloth(cloth, S, dt, floorY, t, vel) {
+    if (cloth.rope) Rig.stepRope(cloth.rope, S, dt);
     const wind = [-S.facing * 220 - vel * 2.2, -60];
     for (const it of cloth) {
       const k = it.ch.opt.wind;
       it.ch.step(anchor(S, it), dt, [wind[0] * k, wind[1] * k], floorY, t);
     }
   }
-  function resetCloth(cloth, S) { for (const it of cloth) it.ch.reset(anchor(S, it), S.facing); }
+  function resetCloth(cloth, S) { for (const it of cloth) it.ch.reset(anchor(S, it), S.facing); if (cloth.rope) cloth.rope.pts = null; }
 
   function drawStrand(ctx, it, tint, ghost) {
     const c = it.c, pts = it.ch.p;
@@ -954,6 +957,7 @@ const Chars = (() => {
     const front = { ol: EDGE, flat: !!opt.flash, c: (c) => (opt.flash ? "#f4f6fb" : c) };
     const back = { ol: EDGE, flat: !!opt.flash, c: (c) => (opt.flash ? "#c9cdd6" : shade(c, -0.3)) };
     S.fem = def.gender === "F";
+    S.rope = cloth && cloth.rope || null;
     ctx.save();
     ctx.globalAlpha = opt.alpha !== undefined ? opt.alpha : 1;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
@@ -966,7 +970,7 @@ const Chars = (() => {
     if (S.B.arms4) drawArm(ctx, S, "lowerB", parts.arms.lower, back, ghost, opt);
     drawLeg(ctx, S, "back", parts.legs, back, ghost);
     const bArm = drawArm(ctx, S, "back", parts.arms.back, back, ghost, opt);
-    if (def.weaponDraw === "pistols" && !ghost) Rig.WEAPON_DRAW.pistols(ctx, S, S.L.fh, p.w, P.accent, P, "back");
+    if ((def.weaponDraw === "pistols" || def.weaponDraw === "daggerLash") && !ghost) Rig.WEAPON_DRAW[def.weaponDraw](ctx, S, S.L.fh, p.w, P.accent, P, "back");
     drawPad(ctx, S, "back", parts.arms.back.pad, back, ghost);
     drawTorso(ctx, S, parts.torso, front, ghost);
     if (parts.torso.mantle) drawMantle(ctx, S, parts.torso.mantle, front, ghost);

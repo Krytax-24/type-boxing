@@ -137,6 +137,46 @@ const Anim = (() => {
     combo: ["a1", "a2", "a1", "a2", "a3", "a4"],
   };
 
+  // Crimson Veil: a braided whip held by its middle, a dagger tied to each end. The lashes are long (reach 150),
+  // so every attack is a cast: a wind-up that cocks the arm, a snap that pulls the cord straight and puts the
+  // dagger into the target, then a recoil that lets the cord fall slack again. w and w2 are the lash angles.
+  W.lash = {
+    name: "Dagger lash", tier: "Crimson Veil", reach: 150, heavy: 0, twoBlades: true,
+    lean: 18, legs: [-58, -98],
+    arms: Object.assign({}, W.dual.arms, {
+      guard: { fa: [-50, -60], w: -78, ba: [-120, -70], w2: -104 }, guard2: { fa: [-53, -64], w: -84, ba: [-123, -74], w2: -108 },
+      hit: { fa: [70, 130], w: 150, ba: [120, 160], w2: 160 }, parry: { fa: [40, 100], w: 20, ba: [50, 100], w2: 160 },
+    }),
+    attacks: (G) => ({
+      a1: { label: "Attack 1: overhand lash", dur: 0.44, frames: 4, keys: [
+        [0, G], [0.18, P(G, { lean: 4, x: -6, fa: [115, 140], w: 155, ba: [-70, -60], w2: -95 })],
+        [0.36, P(G, { lean: 26, x: 14, fa: [-4, -14], w: -6, ba: [-70, -60], w2: -95 })],
+        [0.58, P(G, { lean: 22, x: 16, fa: [-45, -60], w: -75, ba: [-70, -60], w2: -95 })], [1, P(G, { x: 16 })]],
+        events: [[0.36, "impact"]], trails: [[0.2, 0.52, 0]] },
+      a2: { label: "Attack 2: backhand lash", dur: 0.44, frames: 4, keys: [
+        [0, G], [0.18, P(G, { lean: 4, x: -6, fa: [-60, -50], w: -80, ba: [150, 172], w2: 172 })],
+        [0.36, P(G, { lean: 26, x: 14, fa: [-60, -50], w: -80, ba: [-6, -16], w2: -8 })],
+        [0.58, P(G, { lean: 22, x: 16, fa: [-60, -50], w: -80, ba: [-40, -70], w2: -80 })], [1, P(G, { x: 16 })]],
+        events: [[0.36, "impact"]], trails: [[0.2, 0.52, 1]] },
+      a3: { label: "Attack 3: crossing snap", dur: 0.7, frames: 5, hitType: "hitHeavy", keys: [
+        [0, G], [0.14, P(G, { lean: 6, x: -4, fa: [100, 125], w: 140, ba: [-40, -50], w2: -60 })],
+        [0.3, P(G, { lean: 24, x: 12, fa: [-32, -48], w: -34, ba: [150, 165], w2: 168 })],
+        [0.42, P(G, { lean: 14, x: 12, fa: [-60, -70], w: -85, ba: [160, 175], w2: 178 })],
+        [0.58, P(G, { lean: 26, x: 22, fa: [-60, -70], w: -85, ba: [24, 36], w2: 30 })], [0.8, P(G, { lean: 22, x: 24, ba: [-30, -60], w2: -70 })], [1, P(G, { x: 24 })]],
+        events: [[0.3, "impact"], [0.58, "impact"]], trails: [[0.16, 0.42, 0], [0.42, 0.7, 1]] },
+      a4: { label: "Attack 4: whirling lash", dur: 0.8, frames: 5, hitType: "knockdown", keys: [
+        [0, G], [0.16, P(G, { lean: 10, legs: [-52, -100], fa: [0, -6], w: -4, ba: [175, 180], w2: 184 })],
+        [0.46, P(G, { turn: 180, lean: 4, x: 22, fa: [0, -6], w: -4, ba: [175, 180], w2: 184 })],
+        [0.78, P(G, { turn: 360, lean: 8, x: 44, fa: [-6, -12], w: -12, ba: [172, 176], w2: 180 })], [1, P(G, { turn: 360, x: 44 })]],
+        events: [[0.42, "impact"], [0.76, "impact"]], trails: [[0.12, 0.88, 0], [0.12, 0.88, 1]], ghosts: [0.14, 0.8] },
+      taunt: { label: "Taunt: lash twirl", dur: 1.5, frames: 4, keys: [
+        [0, G], [0.2, P(G, { lean: 2, fa: [60, 70], w: 90, ba: [-120, -80], w2: -110 })],
+        [0.62, P(G, { lean: 0, fa: [60, 70], w: 810, ba: [-120, -80], w2: -110 })],
+        [0.82, P(G, { lean: -4, fa: [30, 90], w: 800, ba: [45, 95], w2: 400 })], [1, P(G, { lean: -4, fa: [30, 90], w: 800, ba: [45, 95], w2: 400 })]] },
+    }),
+    combo: ["a1", "a2", "a3", "a1", "a2", "a4"],
+  };
+
   W.spear = {
     name: "Spear", tier: "Bo staff in the game", reach: 205, heavy: 0,
     lean: 12, legs: [-60, -96],
@@ -844,6 +884,19 @@ const Anim = (() => {
       [0.45, P(G, { lean: w.lean - 6, x: -22 })], [1, P(G, { x: -22 })]],
       events: [[0.02, "hurt"]] };
 
+    // Heavy hit, knockdown and air attack, so a fighter built on this older path (Crimson Veil) has the same reactions as the rest.
+    C.hitHeavy = { label: "Hit (heavy, stagger)", dur: 0.75, frames: 4, blendIn: 0.03, react: true, lockUntil: 0.6, keys: [
+      [0, G], [0.12, at({ lean: -30, head: -18, x: -26, legs: [L0[0] + 10, L0[1] - 6] }, A.hit)],
+      [0.34, at({ lean: -26, head: -14, x: -30, legs: [L0[0] + 10, L0[1] - 6] }, A.hit)],
+      [0.62, P(G, { lean: w.lean - 8, x: -44 })], [1, P(G, { x: -44 })]], events: [[0.02, "hurt"], [0.5, "step"]] };
+    const lie = { lean: 5, rot: -88, air: 1, y: -56, x: -66, fl: [-92, -92], bl: [-88, -88], ffa: -90, bfa: -90 };
+    C.knockdown = { label: "Knockdown and get up", dur: 1.8, frames: 6, blendIn: 0.03, react: true, lockUntil: 0.94, keys: [
+      [0, G], [0.08, at({ lean: -30, head: -16, x: -12 }, A.hit)],
+      [0.26, at({ lean: -20, rot: -30, air: 0.6, y: -22, x: -46, fl: [-30, -100], bl: [-60, -125], ffa: -30, bfa: -30 }, A.topple)],
+      [0.4, at(lie, A.dead)], [0.66, at(lie, A.dead)],
+      [0.8, at({ lean: 8, rot: -40, air: 0.5, y: -26, x: -66, fl: [-30, -100], bl: [-60, -125], ffa: -30, bfa: -30 }, A.topple)],
+      [0.92, P(G, { x: -66, lean: w.lean + 24, legs: [-45, -108] })], [1, P(G, { x: -66 })]],
+      events: [[0.02, "hurt"], [0.4, "thud"], [0.42, "dust"], [0.84, "dust"]] };
     C.parry = { label: "Parry / block", dur: 0.5, frames: 4, keys: [
       [0, G], [0.22, at({ lean: -2, x: -6 }, A.parry)], [0.55, at({ lean: 0, x: -8 }, A.parry)], [1, P(G, { x: -8 })]],
       events: [[0.24, "parry"]] };
@@ -861,6 +914,13 @@ const Anim = (() => {
 
     const atk = w.attacks(G);
     for (const k in atk) C[k] = atk[k];
+    if (w.attacks && !C.air) {
+      const ag = (o) => P(G, Object.assign({ air: 1, y: 0, fl: [-20, -110], bl: [-60, -140], ffa: -20, bfa: -30 }, o));
+      C.air = { label: "Air attack: diving lash", dur: 0.48, frames: 4, air: true, hitType: "hitHeavy", keys: [
+        [0, ag({ lean: 6, fa: [115, 140], w: 155, ba: [-70, -60], w2: -95 })], [0.3, ag({ lean: 24, fa: [-4, -14], w: -6, ba: [-70, -60], w2: -95 })],
+        [0.62, ag({ lean: 20, fa: [-30, -40], w: -40, ba: [-70, -60], w2: -95 })], [1, ag({ fl: [-50, -96], bl: [-100, -106] })]],
+        events: [[0.3, "impact"]], trails: [[0.2, 0.5, 0]] };
+    }
     C.combo = { label: "Combo sequence", seq: w.combo, frames: 6 };
 
     for (const k in C) {
@@ -870,6 +930,8 @@ const Anim = (() => {
       c.trails = c.trails || [];
       if (c.next === undefined) c.next = "idle";
       if (c.loop === undefined) c.loop = false;
+      const hits = c.events.filter((e) => e[1] === "impact").map((e) => e[0]);
+      if (/^a[1-4]$|^air$/.test(k) && hits.length) c.cancelAt = Math.min(0.92, Math.max(...hits) + 0.05);
     }
     C.guard = G;
     return C;

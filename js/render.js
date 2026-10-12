@@ -54,6 +54,25 @@ const ANIMS = {
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => t * t * (3 - 2 * t);
 
+// Brawl (the fighting mode): poses and attack animations. Frames of an attack run from 0 to 1 across its total length.
+const CROUCH = P({ lean: 24, fa: [14, 85], ba: [-20, 75], fl: [-5, -120], bl: [-170, -60] });
+const BLOCK_HI = P({ lean: -2, fa: [75, 115], ba: [60, 105] });
+const BLOCK_LO = P({ lean: 24, fa: [75, 115], ba: [60, 105], fl: [-5, -120], bl: [-170, -60] });
+const KICK_POSE = P({ lean: -10, fa: [30, 70], ba: [-30, 60], fl: [22, 6], bl: [-100, -88] });
+const SWEEP_POSE = P({ lean: 34, fa: [20, 60], ba: [-30, 60], fl: [-8, -4], bl: [-170, -60] });
+const THROW_BACK = P({ lean: -8, fa: [140, 150], ba: [150, 140] });
+const THROW_OUT = P({ lean: 16, fa: [4, 2], ba: [8, 0], fl: [-50, -95], bl: [-130, -80] });
+const BRAWL_ANIMS = {
+  punch: ANIMS.jab,
+  kick: [[0, GUARD], [0.3, KICK_POSE], [0.55, KICK_POSE], [1, GUARD]],
+  lowPunch: [[0, CROUCH], [0.3, P({ lean: 30, fa: [4, 2], fl: [-5, -120], bl: [-170, -60] })], [0.6, P({ lean: 30, fa: [4, 2], fl: [-5, -120], bl: [-170, -60] })], [1, CROUCH]],
+  sweep: [[0, CROUCH], [0.3, SWEEP_POSE], [0.5, SWEEP_POSE], [1, CROUCH]],
+  jumpPunch: [[0, AIR], [1, P({ lean: 14, fa: [4, 2], ba: [20, 60], fl: [-40, -100], bl: [-80, -120] })]],
+  jumpKick: [[0, AIR], [1, P({ lean: -20, fa: [70, 35], ba: [140, 170], fl: [6, 2], bl: [-95, -125] })]],
+  wave: [[0, GUARD], [0.35, THROW_BACK], [0.5, THROW_OUT], [0.8, THROW_OUT], [1, GUARD]],
+};
+
+
 function lerpPose(a, b, t) {
   const o = { lean: lerp(a.lean, b.lean, t), rot: lerp(a.rot, b.rot, t) };
   for (const k of ["fa", "ba", "fl", "bl"]) o[k] = [lerp(a[k][0], b[k][0], t), lerp(a[k][1], b[k][1], t)];
@@ -143,7 +162,25 @@ class Renderer {
   }
 
   // Pick the pose for a fighter from its state.
+  // The fighting mode keeps a small description of what the fighter is doing (f.bp); this turns it into a pose.
+  brawlPose(f) {
+    const b = f.bp, u = b.tot ? Math.min(1, b.fr / b.tot) : 0;
+    if (b.st === "down") return { ...DOWN, rot: -90 };
+    if (b.st === "hit") return b.air ? { ...HURT, rot: -25 } : HURT;
+    if (b.st === "block") return b.crouch ? BLOCK_LO : BLOCK_HI;
+    if (b.st === "air") return AIR;
+    if (b.st === "attack") return sample(BRAWL_ANIMS[b.mv] || ANIMS.jab, u);
+    if (b.crouch) return CROUCH;
+    if (Math.abs(b.vx) > 20) {
+      const ph = this.clock * 11 * (Math.sign(b.vx) === f.facing ? 1 : -1), sn = Math.sin(ph), cs = Math.cos(ph);
+      return { ...GUARD, fl: [-60 + 24 * sn, -95 + 14 * cs], bl: [-120 - 24 * sn, -85 - 14 * cs] };
+    }
+    const bob = Math.sin(this.clock * 4 + (f.team === "enemy" ? 1.5 : 0)) * 2;
+    return { ...GUARD, lean: GUARD.lean + bob, fa: [GUARD.fa[0] + bob, GUARD.fa[1]] };
+  }
+
   poseFor(f) {
+    if (f.bp) return this.brawlPose(f);
     if (f.state === "attack" && f.move) {
       const mv = CONFIG.moves[f.move];
       const pose = sample(ANIMS[f.move], Math.min(f.moveT / mv.dur, 1));
@@ -227,11 +264,13 @@ class Renderer {
     // Fighters, farther ones first. On the title screen: a slow sparring loop instead.
     const C = this.chars && typeof DuelChars !== "undefined" ? this.chars : null;
     const copt = { res: k, noShake: this.shakeScale === 0 || this.reduceMotion, shakeScale: this.shakeScale, shadow: CONFIG.theme.arena.shadow };
+    if (sim.streams) sim.puppetHits = !!C && sim.phase !== "menu"; // the 2D puppets' impact frames drive the hit show (Duel.hitLanded)
     if (this.menuSpar && sim.phase === "menu") {
       const cx = sx(sim.cameraX !== undefined ? sim.cameraX : W / 2);
       if (C) DuelChars.drawSpar(ctx, C.keys, cx, floorY, this.reduceMotion ? 0 : dt, C.glows, copt);
       else this.drawSpar(ctx, cx, floorY);
-    } else if (C && sim.streams) DuelChars.drawDuel(ctx, sim, sx(0), floorY, dt, C.keys, C.glows, copt);
+    } else if (sim.puppets) sim.puppets(ctx, sx, floorY, dt, copt);   // Brawl draws its own fighters (js/brawl-game.js)
+    else if (C && sim.streams) DuelChars.drawDuel(ctx, sim, sx(0), floorY, dt, C.keys, C.glows, copt);
     else for (const f of sim.fighters.slice().sort((a, b) => a.z - b.z)) this.drawFighter(ctx, f, sx(f.x), floorY);
     this.drawFx(ctx, sim, sx, floorY, W);
     for (const e of sim.enemies) if (!e.dead) this.drawEnemyBar(ctx, e, sx(e.x), floorY);
@@ -306,6 +345,11 @@ class Renderer {
     const flashing = wrongAge >= 0 && wrongAge < P.wrongTime;
     const breakAge = now - me.lastComboBreakAt;
     const breaking = breakAge >= 0 && breakAge < P.breakTime;
+    // A word skipped under the typo rule: the border flashes red (no crack unless a whole combo level went too)
+    // and the skipped word floats up struck out.
+    const skipAge = now - me.lastSkipAt;
+    const skipping = skipAge >= 0 && skipAge < P.breakTime;
+    const hot = breaking || skipping;
     const shakeX = flashing && !this.reduceMotion ? Math.sin(wrongAge * 95) * P.shake * Math.min(1.5, this.shakeScale) * (1 - wrongAge / P.wrongTime) : 0;
 
     const x = Math.round(st.x + shakeX), y = Math.round(st.y);
@@ -329,10 +373,10 @@ class Renderer {
     ctx.fill();
 
     // Border: red flash on a combo break, gold for the ultimate.
-    const bt = breaking ? 1 - breakAge / P.breakTime : 0;
-    ctx.lineWidth = breaking ? 2 + bt : 1.5;
-    ctx.strokeStyle = breaking ? C.wrong : ult ? C.ultBorder : C.border;
-    if (breaking) ctx.globalAlpha = 0.35 + 0.65 * bt;
+    const bt = hot ? 1 - Math.min(breaking ? breakAge : 1e9, skipping ? skipAge : 1e9) / P.breakTime : 0;
+    ctx.lineWidth = hot ? 2 + bt : 1.5;
+    ctx.strokeStyle = hot ? C.wrong : ult ? C.ultBorder : C.border;
+    if (hot) ctx.globalAlpha = 0.35 + 0.65 * bt;
     roundRect(ctx, x, y, l.width, l.h, P.radius);
     ctx.stroke();
     if (breaking) {
@@ -389,6 +433,20 @@ class Renderer {
     // Caret slides through the word.
     ctx.fillStyle = caretColor(mine);
     ctx.fillRect(Math.round(wx + st.caret - 1), Math.round(midY - l.font * 0.5), 3, l.font);
+
+    // The word that was just skipped, struck out, drifting up and fading.
+    if (me.lastSkipText && skipAge >= 0 && skipAge < P.skipTime && !this.reduceMotion) {
+      const k = skipAge / P.skipTime;
+      ctx.save();
+      ctx.globalAlpha = 1 - k;
+      ctx.font = `bold ${P.nextFont + 2}px ${MONO}`;
+      ctx.textAlign = "left";
+      ctx.fillStyle = C.wrong;
+      const sy = y - 8 - k * 16, w = ctx.measureText(me.lastSkipText).width;
+      ctx.fillText(me.lastSkipText, x + P.padX, sy);
+      ctx.fillRect(Math.round(x + P.padX), Math.round(sy), Math.round(w), 2);
+      ctx.restore();
+    }
 
     // Next word, smaller and dimmer.
     if (l.next) {
@@ -813,6 +871,16 @@ class Renderer {
           ctx.strokeText(fx.text, tx, ty);
         }
         ctx.fillText(fx.text, tx, ty);
+      } else if (fx.type === "orb") { // the Brawl fireball: a glowing ball with a short tail
+        const dir = fx.dir || 1;
+        ctx.globalAlpha = 0.25; ctx.fillStyle = fx.color;
+        ctx.beginPath(); ctx.arc(x, y, fx.size * 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.ellipse(x - dir * fx.size * 0.9, y, fx.size * 1.1, fx.size * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.beginPath(); ctx.arc(x, y, fx.size * 0.8, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(x, y, fx.size * 0.4, 0, Math.PI * 2); ctx.fill();
       } else if (fx.type === "ring") {
         ctx.strokeStyle = fx.color; ctx.lineWidth = 4;
         ctx.beginPath();

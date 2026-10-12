@@ -100,7 +100,7 @@ function hpHtml(name) {
   return `
     <div class="nameplate">
       <div class="who"><span class="pname">${name}</span><span class="pweapon"></span></div>
-      <span class="hpnum">100</span>
+      <span class="hpnum">100</span><span class="healtag"></span>
     </div>
     <div class="hpbar"><div class="hpghost"></div><div class="hpfill"></div></div>`;
 }
@@ -121,7 +121,7 @@ function statsHtml() {
 function panelRefs(top, el) {
   const q = (sel) => top.querySelector(sel) || el.querySelector(sel);
   return {
-    root: el, name: q(".pname"), hpnum: q(".hpnum"), hp: q(".hpfill"),
+    root: el, name: q(".pname"), hpnum: q(".hpnum"), heal: q(".healtag"), hp: q(".hpfill"),
     ghost: q(".hpghost"), ghostHp: CONFIG.duel.maxHp, ghostHold: 0,
     wpm: q(".wpm b"), power: q(".power b"), combo: q(".combo b"),
     comboBox: q(".combo"), stun: q(".stun"), counter: q(".countertag"),
@@ -142,7 +142,15 @@ $("hp1").innerHTML = hpHtml("YOU");
 $("hp2").innerHTML = hpHtml("BOT");
 $("p1").innerHTML = statsHtml();
 $("p2").innerHTML = statsHtml();
-const panels = [panelRefs($("hp1"), $("p1")), panelRefs($("hp2"), $("p2"))];
+const panelSet = [panelRefs($("hp1"), $("p1")), panelRefs($("hp2"), $("p2"))];
+let panels = panelSet;   // panels[0] is you; on the right side of the arena (Settings > Starting side) it is the right-hand set
+// Put you on the left or right of the typing fight: the fighters, the HUD plates and the tug rope follow.
+function applySeat(right) {
+  duel.mirror = !!right;
+  ui.classList.toggle("mirror", !!right);
+  panels = right ? [panelSet[1], panelSet[0]] : panelSet;
+  panelSet.forEach((p) => { p.ghostHp = CONFIG.duel.maxHp; p.ghostHold = 0; });
+}
 
 // The palette is defined once in CONFIG.theme and applied by Themes.init() (js/themes.js), which writes it onto
 // :root so CSS and canvas always agree and also handles the player's theme, background and custom CSS.
@@ -240,8 +248,13 @@ function resize() {
   const over = viewMode === "overhead";
   renderer.res = canvas.height / (over ? V.height : V.classicHeight);
   renderer.floorFromBottom = over ? V.floorFromBottom : V.classicFloorFromBottom;
+  if (isPhone() && h > w) renderer.floorFromBottom += 60;   // upright phone: lift the fight clear of the touch controls
 
   uiScale = Math.max(V.uiMinScale, Math.min(V.uiMaxScale, w / V.uiSize[0], h / V.uiSize[1])) * settings.uiScale; // x Graphics > Interface size
+  // A narrow window (a phone held upright): lay the menus out in one column, about 440 design px wide.
+  const narrow = w < 700;
+  if (narrow) uiScale = Math.max(0.6, w / 440) * settings.uiScale;
+  ui.classList.toggle("narrow", narrow);
   ui.style.width = w / uiScale + "px";
   ui.style.height = h / uiScale + "px";
   ui.style.transform = `scale(${uiScale})`;
@@ -249,6 +262,7 @@ function resize() {
   const inner = (16 + 432 + 16) * uiScale;
   renderer.clearHalf = Math.max(0.25, (w / 2 - inner) / (w / 2));
   if (screen === "fighter") sizePreview();
+  if (screen === "creator") sizeCreatorPreview();
 }
 window.addEventListener("resize", resize);
 
@@ -295,7 +309,9 @@ function toast(msg) {
 // next one in the roster when it is yours. Both typists keep one identity color (CONFIG.chars.you and .foe)
 // for the HUD, the word plate letters, the sparks and the glow around the fighter.
 const CH = CONFIG.chars;
-const ROSTER = Chars.ORDER;
+Creator.load();   // the player's own fighters (js/creator.js) join the roster
+let ROSTER = Chars.ORDER.concat(Creator.keys());
+Creator.setOnChange(() => { ROSTER = Chars.ORDER.concat(Creator.keys()); if (!ROSTER.includes(charKey)) charKey = CH.defaultChar; });
 let charKey = CH.defaultChar;
 try {
   const saved = localStorage.getItem(CH.storageKey);
@@ -314,7 +330,7 @@ function loadHistory() {
   } catch (e) { return []; }
 }
 function saveHistory(wpm) {
-  const h = loadHistory().concat([Math.round(wpm)]).slice(-MM.history);
+  const h = loadHistory().concat([Math.round(wpm * 10) / 10]).slice(-MM.history);
   try { localStorage.setItem(MM.storageKey, JSON.stringify(h)); } catch (e) { /* not saved, still works */ }
 }
 // MATCH ME aims at your average wpm over your last few matches (MM.start before you have any).
@@ -322,16 +338,37 @@ function matchTarget() {
   const h = loadHistory().slice(-MM.history);
   return h.length ? Math.round(h.reduce((a, b) => a + b, 0) / h.length) : MM.start;
 }
-// The settings the Bot class gets for bot i. MATCH ME's key rate comes from Bot.rawWpmFor, so its measured
-// average (correct keystrokes only, like yours) lands on the target.
+// The settings the Bot class gets for bot i: `wpm` is the card number (the measured average), and Bot.cfgFor turns it
+// into the raw key rate. MATCH ME aims at your own recent average. `beatAt` is the same number, for the cards.
 function botCfgFor(i) {
   const b = BOTS[i];
-  if (!b.match) return b;
-  const t = matchTarget();
-  return Object.assign({}, b, { wpm: Bot.rawWpmFor(t, b), beatAt: t });
+  const card = b.match && matchUnlocked() ? Object.assign({}, b, { wpm: matchTarget() }) : b; // locked MATCH ME shows its start value, never used in a fight
+  return Object.assign(Bot.cfgFor(card), { beatAt: card.wpm });
 }
 // The fighter bot i plays as against your fighter.
 function botCharFor(i) { return DuelChars.botKey(BOTS[i].char, charKey); }
+// MATCH ME copies YOUR recent speed, so it stays locked until you have finished a match of your own.
+const matchUnlocked = () => loadHistory().length > 0;
+
+// ---------- Runs and modes (js/modes.js holds the rules; this is the screens and timers) ----------
+const MODE = CONFIG.modes;
+let run = null;            // the match in progress: { kind: bots | endless | practice | online, rules, wins: [mine, theirs], round }
+let offlineMode = "bots";  // chosen on the Offline screen: bots | endless | practice
+let titleView = "home";    // the title screen shows "home", "offline" or "brawl"
+const BR = CONFIG.brawl;
+const brawlMode = "bot";   // Backspace Brawl menu: Fight is against a bot, Online opens the room screen
+let brawlBot = BR.defaultBot;
+let roundTimer = 0;        // setTimeout id of the pause between two rounds
+const rulesNow = () => Modes.cleanRules({ rounds: settings.mRounds, timer: settings.mTimer, endless: settings.mEndless, words: settings.mWords });
+function readJson(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+function writeJson(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { /* not saved, still works */ } }
+let practice = Modes.cleanPractice(readJson(MODE.practice.storageKey));
+{ const sv = readJson(BR.storageKey); if (sv && BR.bots[sv.bot]) brawlBot = sv.bot; }
+const saveBrawl = () => writeJson(BR.storageKey, { bot: brawlBot });
+function cancelRoundTimer() { if (roundTimer) { clearTimeout(roundTimer); roundTimer = 0; } }
+function showBanner(title, sub) { const b = $("round-banner"); b.innerHTML = `<b>${title}</b><span>${sub || ""}</span>`; b.classList.remove("hidden"); }
+function hideBanner() { $("round-banner").classList.add("hidden"); }
+
 
 // Identity colors on the fighters (cosmetic fields only), the 2D fighters for the renderer, and every piece
 // of HUD that belongs to a player.
@@ -368,7 +405,7 @@ let setRow = 0;          // focused settings row
 let view = null;
 let bot = null;          // the computer typist; a network peer will take its place later
 let botCfg = null;       // the bot settings of the current match
-let botIndex = 3;        // DUELIST
+let botIndex = 4;        // DUELIST
 let shownResult = false;
 let resultShownAt = 0;   // keys are ignored for a moment after the result appears (you may still be typing)
 let rec = null;          // Stats.Recorder of the match in progress (js/stats.js): watches your typing, never changes it
@@ -381,9 +418,27 @@ const online = {
   profile: null, peerProfile: null, seed: 0, seq: 0, snapN: 0, snapNext: 0,
   keyQueue: [], keyFlushAt: 0, hostSentResult: false, active: false, waitingResult: null,
   trace: [],
+  startedAt: 0, lastSnapAt: 0, snapDirty: false, pingAt: 0, pingId: 0, rtt: 0,
 };
 
-function inMatch() { return duel.phase === "countdown" || duel.phase === "fight"; }
+// A small "ping 48 ms" badge while an online match runs (green under 80 ms, amber under 160, red above).
+let pingBadge = null;
+function updateOnlineBadge() {
+  if (!pingBadge) {
+    pingBadge = document.createElement("div");
+    pingBadge.id = "ping-badge";
+    pingBadge.setAttribute("aria-hidden", "true");
+    document.body.appendChild(pingBadge);
+  }
+  const show = online.active && online.rtt > 0;
+  pingBadge.hidden = !show;
+  if (!show) return;
+  const ms = Math.round(online.rtt);
+  pingBadge.textContent = "ping " + ms + " ms";
+  pingBadge.dataset.q = ms < 80 ? "good" : ms < 160 ? "fair" : "bad";
+}
+
+function inMatch() { return duel.phase === "countdown" || duel.phase === "fight" || BrawlGame.inFight(); }
 function topModal() { return modals[modals.length - 1] || null; }
 function isOnlineMatch() { return online.active || online.screenState === "result"; }
 function paused() { return inMatch() && modals.length > 0 && !isOnlineMatch(); }
@@ -398,30 +453,119 @@ function showScreen(name) {
 }
 
 // Buttons. Every action shown on screen is a button with the same action as its key (act()).
-const kb = (k) => `<kbd>${k}</kbd>`;
+const kb = () => "";   // key hints are not shown on screen; keys still work (see onKey)
+const isPhone = () => { try { return (BrawlInput.isTouchDevice() || new URLSearchParams(location.search).has("phone")) && Math.min(window.innerWidth, window.innerHeight) < 600; } catch (e) { return false; } };
 const btn = (act, label, k, cls = "") => `<button class="btn ${cls}" data-act="${act}" tabindex="-1">${label}${k ? kb(k) : ""}</button>`;
 const mbtn = (act, label, k, cls = "", sub = "") =>
   `<button class="mbtn ${cls}" data-act="${act}" tabindex="-1"><span>${label}${sub ? `<span class="sub">${sub}</span>` : ""}</span>${kb(k)}</button>`;
-const keyBtn = (act, k, label) => `<button class="key" data-act="${act}" tabindex="-1">${kb(k)}<b>${label}</b></button>`;
+const keyBtn = (act, k, label) => `<button class="key" data-act="${act}" tabindex="-1"><b>${label}</b></button>`;
 function keyline(items) { $("keyline").innerHTML = items.join(""); }
 const botKeys = () => `1 to ${BOTS.length}`;
 
 function botCard(b, i) {
   const cfg = botCfgFor(i), d = charDef(botCharFor(i));
-  return `<button class="bot-opt pick ${b.match ? "match" : ""} ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1">` +
-    `${kb(i + 1)}<span><span class="bname">${b.name}<i>${d.name}</i></span><span class="bstyle">${b.style}</span></span>` +
-    `<span class="beat">win at about<b>${Math.round(cfg.beatAt)} wpm</b></span></button>`;
+  const locked = b.match && !matchUnlocked();
+  return `<button class="bot-opt pick ${b.match ? "match" : ""} ${locked ? "locked" : ""} ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1">` +
+    `${kb(i + 1)}<span><span class="bname">${b.name}<i>${d.name}</i></span><span class="bstyle">${locked ? "Finish a match first, then it copies your speed" : b.style}</span></span>` +
+    `<span class="beat">${locked ? "locked" : `win at about<b>${Math.round(cfg.beatAt)} wpm</b>`}</span></button>`;
+}
+
+// A row of choices in the menus. `key` is a setting ("mRounds") or a practice value ("p.wpm"); see setOpt().
+function optRow(label, hint, key, opts, cur, off) {
+  return `<div class="optrow"><span class="lbl">${label}<span class="hint">${hint}</span></span><span class="segs">` +
+    opts.map(([v, l]) => `<button class="seg ${v === cur ? "sel" : ""}" data-act="opt:${key}:${v}" tabindex="-1" ${off ? "disabled" : ""}>${l}</button>`).join("") + `</span></div>`;
+}
+const timerOpts = () => MODE.timerSteps.map((n) => [n, n ? n + "s" : "Off"]);
+const wordOpts = [["on", "On"], ["off", "Off"], ["mix", "Mix"]];
+const WORD_HINT = "On: everyone presses Space to end a word. Off: a word ends by itself when it is exactly right. Mix: each player keeps their own Typing setting.";
+// The match rules. Offline bots: rounds, timer, word submit. Online adds Endless (nobody loses HP).
+// `off` greys them out (an online guest cannot set them); withMatchRules false leaves only the word submit row.
+function rulesHtml(off, withMatchRules = true, compact = false, online = false) {
+  const r = rulesNow(), brawl = online && settings.mGame === "brawl";
+  return `<div class="optrows ${compact ? "compact" : ""}">` +
+    (online && !isPhone() ? optRow("Game", "Typing: type words to fight. Backspace Brawl: fight with keys, a controller or touch.", "mGame", [["typing", "Typing"], ["brawl", "Backspace Brawl"]], settings.mGame, off) : "") +
+    (withMatchRules ?
+      optRow("Rounds", "Best of this many. A tie plays one more.", "mRounds", MODE.roundSteps.map((n) => [n, String(n)]), r.rounds, off) +
+      optRow("Round timer", "When time runs out, the higher HP wins.", "mTimer", timerOpts(), r.timer, off) +
+      (online && !brawl ? optRow("Endless", "Nobody loses HP and nobody is knocked out. Just type.", "mEndless", [[false, "Off"], [true, "On"]], r.endless, off) : "") : "") +
+    (brawl ? "" : optRow("Word submit", WORD_HINT, "mWords", wordOpts, r.words, off)) + `</div>`;
+}
+function practiceHtml() {
+  const P = MODE.practice, p = practice;
+  return `<div class="card-label"><span>Practice dummy</span><span>set it your way</span></div><div class="optrows">` +
+    optRow("Dummy speed", "0 makes a dummy that only stands there.", "p.wpm", P.wpmSteps.map((n) => [n, n ? String(n) : "Still"]), p.wpm) +
+    optRow("Dummy accuracy", "How often each of its letters is right.", "p.accuracy", P.accuracySteps.map((n) => [n, n + "%"]), p.accuracy) +
+    optRow("Dummy loses HP", "Off: it can never be knocked out, so you can practice forever.", "p.dummyHurt", [[false, "No"], [true, "Yes"]], p.dummyHurt) +
+    optRow("You lose HP", "Off: you cannot be knocked out either.", "p.youHurt", [[false, "No"], [true, "Yes"]], p.youHurt) +
+    `</div>` + rulesHtml(false, false);
+}
+function endlessHtml() {
+  return `<div class="card-label"><span>Endless</span><span>no timer</span></div>` +
+    `<p class="opt-note">One bot, no clock. Every knock out starts the next round and the score keeps counting until you quit from the pause menu. Pick the bot, then fight.</p>` +
+    `<div class="optrows compact">` + optRow("HP loss", "Off: nobody can be knocked out, so you just type.", "eHurt", [[true, "On"], [false, "Off"]], settings.eHurt) + `</div>` + rulesHtml(false, false, true);
+}
+
+// ---------- Brawl menu (the fighting mode that needs no typing) ----------
+function brawlControlsHtml() {
+  const L = BrawlInput.labels(), K = L.keys, name = Chars.DEFS[charKey] ? Chars.DEFS[charKey].name : "";
+  const fin = Brawl.combosOf(charKey).map((c) => `<dt>${c.name}</dt><dd>${c.seq.split(",").map((b) => (isPhone() ? { hp: "HP", lp: "LP", hk: "HK", lk: "LK" }[b] : K[b])).join(" ")}</dd>`).join("");
+  const finCard = `<div class="card-label"><span>${name} finishers</span><span>land a hit, then press in order</span></div><dl class="ctl">${fin}</dl>`;
+  if (isPhone()) return `<div class="card-label"><span>Controls</span><span>touch</span></div><p class="opt-note">Left thumb: the pad moves, jumps and crouches. Right thumb: HP and HK high punch and kick, LP and LK low punch and kick, with the two small buttons for the projectile and the rising move. Both together make the super. Hold back to block.</p>` + finCard;
+  const rows = [["Move", L.move], ["High", L.high], ["Low", L.low], ["Specials", L.specials]].map(([n, t]) => `<dt>${n}</dt><dd>${t}</dd>`).join("");
+  return `<div class="card-label"><span>Buttons</span><span>${settings.hand} hand</span></div><dl class="ctl">${rows}</dl>` +
+    `<p class="opt-note">Up jumps, down crouches, hold back to block (and down for low). Low punch and low kick together throw. Tap forward or back twice to dash. The super costs ${BR.superCost}% meter. Change the hand in Settings.</p>` + finCard;
+}
+function renderBrawlMenu() {
+  const phone = isPhone();
+  const sub = `vs ${BR.bots[brawlBot].name}`;
+  $("title-menu").innerHTML = mbtn("bstart", "Fight", "", "primary", sub) +
+    mbtn("bonline", "Online", "", "mode", onlineAvailable() ? "private room" : "needs http") +
+    mbtn("creator", "Create a fighter", "", "mode", "your own moveset") +
+    (phone ? mbtn("howto", "How to play", "", "mode") : mbtn("back", "Back", "", "mode"));
+  const bots = brawlMode === "bot"
+    ? `<div class="card-label"><span>Choose your opponent</span><span></span></div>` +
+      BR.bots.map((b, i) => `<button class="bot-opt pick ${i === brawlBot ? "sel" : ""}" data-act="bbot:${i}" tabindex="-1">${kb(i + 1)}<span><span class="bname">${b.name}</span><span class="bstyle">${b.style}</span></span><span class="beat"></span></button>`).join("") : "";
+  const r = rulesNow();
+  const rules = `<div class="optrows compact">` + optRow("Rounds", "Best of this many. A tie plays one more.", "mRounds", MODE.roundSteps.map((n) => [n, String(n)]), r.rounds) +
+    optRow("Round timer", "When time runs out, the higher HP wins.", "mTimer", timerOpts(), r.timer) +
+    (brawlMode === "bot" ? optRow("Starting side", "Start on the left (like player 1) or the right (like player 2).", "side", [["left", "Left"], ["right", "Right"]], settings.side) : "") + `</div>`;
+  $("title-bots").innerHTML = bots + rules + brawlControlsHtml();
+  keyline([]);
+}
+function startBrawlOffline() {
+  cancelRoundTimer();
+  online.active = false; online.screenState = "idle";
+  run = { kind: "brawl", rules: Object.assign(rulesNow(), { endless: false }), wins: [0, 0], round: 1 };
+  modals = []; renderModal();
+  const foe = DuelChars.botKey(brawlMode === "bot" ? BR.bots[brawlBot].char : "ronin", charKey);
+  const side = settings.side === "right" ? 1 : 0;   // which side of the screen you start on (like P1 and P2)
+  BrawlGame.begin({ mode: brawlMode, bot: brawlBot, side, seed: (Math.random() * 1e9) | 0, chars: side ? [foe, charKey] : [charKey, foe] });
 }
 
 function renderTitle() {
   showScreen("title");
-  const cfg = botCfgFor(botIndex);
-  $("title-menu").innerHTML =
-    mbtn("play", "Play", "Enter", "primary", `vs ${BOTS[botIndex].name}, win at about ${Math.round(cfg.beatAt)} WPM`) +
-    mbtn("online", "Online", "O", "", onlineAvailable() ? "private room 1v1" : "serve over http or use ?server=") +
-    mbtn("fighter", "Choose fighter", "C") + mbtn("howto", "How to play", "H") + mbtn("stats", "My stats", "T") + mbtn("settings", "Settings", "S");
-  $("title-bots").innerHTML = `<div class="card-label"><span>Choose your opponent</span><span>${botKeys()}</span></div>` + BOTS.map(botCard).join("");
-  keyline([keyBtn("nextbot", botKeys(), "opponent"), keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+  if (isPhone()) titleView = "brawl";   // phones play Brawl only
+  const home = titleView === "home";
+  $("title-bots").classList.toggle("hidden", home);
+  if (titleView === "brawl") renderBrawlMenu();
+  else if (home) {
+    $("title-menu").innerHTML =
+      mbtn("play", "Play", "Enter", "primary", onlineAvailable() ? "online, private room 1v1" : "needs http, or play offline") +
+      mbtn("offline", "Offline", "O", "", "bots, endless, practice") +
+      mbtn("brawl", "Backspace Brawl", "B", "", "no typing: keys, controller, touch") +
+      mbtn("howto", "How to play", "H") + mbtn("stats", "My stats", "T");
+    keyline([keyBtn("view", "F2", "words: " + viewName())]);
+  } else {
+    const cfg = botCfgFor(botIndex);
+    const sub = offlineMode === "bots" ? `vs ${BOTS[botIndex].name}, ${Math.round(cfg.beatAt)} wpm to win` : offlineMode === "endless" ? `endless vs ${BOTS[botIndex].name}` : "your own dummy";
+    const modeBtn = (m, label, k) => mbtn("mode:" + m, label, k, "mode" + (offlineMode === m ? " sel" : ""));
+    $("title-menu").innerHTML = mbtn("start", "Fight", "Enter", "primary", sub) +
+      modeBtn("bots", "Bots", "B") + modeBtn("endless", "Endless", "E") + modeBtn("practice", "Practice", "P") + mbtn("back", "Back", "Esc", "mode");
+    const botList = `<div class="card-label"><span>Choose your opponent</span><span></span></div>` + BOTS.map(botCard).join("");
+    $("title-bots").innerHTML = offlineMode === "bots" ? botList + rulesHtml(false, true, true)
+      : offlineMode === "endless" ? botList + endlessHtml() : practiceHtml();
+    keyline([]);
+  }
   applyLooks();
 }
 
@@ -430,7 +574,7 @@ function onlineAvailable() {
 }
 
 function onlineProfile() {
-  return { name: "PLAYER", fighter: charKey, color: CH.you.body, gameVersion: CONFIG.net.gameVersion };
+  return { name: "PLAYER", fighter: Creator.baseOf(charKey), color: CH.you.body, gameVersion: CONFIG.net.gameVersion };
 }
 
 function inviteLink() {
@@ -456,71 +600,135 @@ function renderOnline() {
     room += `<span>${online.localReady ? "You are ready" : "You are not ready"} / ${online.remoteReady ? "Opponent ready" : "Opponent not ready"}</span>`;
   }
   $("online-room").innerHTML = room;
+  const guest = online.connected && online.role === "guest";
+  $("online-rules").innerHTML = state === "playing" || state === "result" ? "" :
+    `<div class="card-label"><span>Match rules</span><span>${guest ? "the host chooses" : "you choose as host"}</span></div>` + rulesHtml(guest, true, true, true);
   $("room-code").disabled = !on || online.connected || state === "waiting" || state === "playing";
   const readyLabel = online.localReady ? "Unready" : "Ready";
   const readyBtn = online.connected && state !== "playing" && state !== "result" ? btn("online-ready", readyLabel, "Enter", online.localReady ? "" : "primary") : "";
   $("online-btns").innerHTML =
     (online.connected ? readyBtn + btn("online-leave", "Leave", "Esc") :
-      btn("online-create", "Create room", "C", "primary") + btn("online-join", "Join", "J") + btn("back", "Back", "Esc")) +
+      btn("online-create", "Create room", "C", "primary") + btn("online-join", "Join", "J") + (isPhone() ? "" : btn("offline", "Play offline", "O")) + btn("back", "Back", "Esc")) +
     (on ? "" : `<span class="modal-note">For LAN, serve the folder and open with ?server=lan.</span>`);
-  keyline(online.connected ? [] : [keyBtn("fighter", "F", "fighter"), keyBtn("view", "F2", "words: " + viewName())]);
+  keyline(online.connected || settings.mGame === "brawl" ? [] : [keyBtn("view", "F2", "words: " + viewName())]);
 }
 
-// How to play, built from CONFIG so the numbers always match the rules. Plain words first, numbers second.
+// How to play, built from CONFIG so the numbers always match the rules. Short sentences first, exact numbers last.
 function renderHowto() {
   showScreen("howto");
   const D = CONFIG.duel, U = D.ultimate, w = weaponFor("medium");
-  const pct = (v) => Math.round(v * 100);
+  const step = (n, title, text, cls = "") => `<div class="step ${cls}"><b class="num">${n}</b><div><h4>${title}</h4><p>${text}</p></div></div>`;
+  const row = (k, text) => `<dt>${k}</dt><dd>${text}</dd>`;
   $("scr-howto").innerHTML = `
     <h2 class="screen-title">How to play</h2>
-    <p class="lead">Two typists fight at the same time. <b>Type faster and cleaner than your opponent</b> and your fighter does the hitting. Empty their HP bar to win.</p>
-    <div class="cols">
-      <div class="group"><h3>1. Type the words</h3>
-        <p>The word above your fighter is yours. Type it, then press <kbd>Space</kbd>. <kbd>Backspace</kbd> fixes a letter. A red bar under a letter means a mistake.</p></div>
-      <div class="group"><h3>2. Speed is attack and guard</h3>
-        <p><b>WPM</b> means words per minute. Whoever types faster hits for the <b>difference</b>. The part that gets blocked heals you both, up to ${D.maxHp} HP.</p></div>
-      <div class="group"><h3>3. Build a combo</h3>
-        <p>Type ${w.wordsPerCombo} words in a row with no mistakes to fill the pips. That is <b>one combo level</b>: +${pct(w.comboBonus)}% power each. One wrong key resets it.</p></div>
-      <div class="group"><h3>4. Break theirs, steal a counter</h3>
-        <p>When a mistake breaks a combo, the other typist gets a <b>counter</b>: +${pct(D.counter.powerBonus)}% power for ${D.counter.duration} second.</p></div>
-      <div class="group ult"><h3>5. Land your ultimate</h3>
-        <p>Type fast to fill the gold bar. At 100% and combo x${w.comboRequired}, a <b>gold word</b> appears. Type it clean for ${U.damage} damage and a ${U.stun} second stun. A messy one only does ${U.sloppyDamage}.</p></div>
-      <div class="group"><h3>Choosing an opponent</h3>
-        <p>Every opponent shows the WPM you need to win about half the time. Start low. <b>Match me</b> copies your own recent speed.</p></div>
+    <p class="lead">${isPhone() ? "Backspace Brawl: fight with the on-screen buttons, no typing at all." : "Two ways to fight. In <b>typing</b> fights your typing speed does the hitting. In <b>Backspace Brawl</b> you fight with keys, a controller or touch, no typing at all."}</p>
+
+    <h3 class="sec">Typing fights</h3>
+    <div class="steps">
+      ${step(1, "Type your word", `The word above your fighter is yours. Type it, then press Space. Fix a letter with Backspace. With Word submit off, a word ends by itself when it is exactly right.`)}
+      ${step(2, "Be faster", `Your power is your speed in words per minute. Whoever types faster hits for the difference. Typing also heals you a little.`)}
+      ${step(3, "Stay clean", `Every clean word builds your combo and adds a little power. A mistake halves the combo, and a big drop gives your opponent a counter.`)}
+      ${step(4, "Land the ultimate", `Fast typing fills the gold bar. At 100% with a big combo, a gold word appears. Type it exactly for a heavy hit and a stun.`, "ult")}
     </div>
-    <div class="legend"><h3>Reading the screen</h3>
-      <dl>
-        <dt>Top corners</dt><dd>HP. Yours on the left, theirs on the right.</dd>
-        <dt>EDGE</dt><dd>Who is winning right now. The marker slides toward the leader; the number is HP per second.</dd>
-        <dt>WPM and POWER</dt><dd>Your speed, and your speed plus combo and counter bonuses.</dd>
-        <dt>Pips and ULT</dt><dd>Words toward the next combo level, and the ultimate charge.</dd>
-        <dt>Keys</dt><dd><kbd>Esc</kbd> pause, <kbd>Enter</kbd> start, <kbd>S</kbd> settings, <kbd>T</kbd> your stats.</dd>
-      </dl></div>
-    <div class="btn-row">${btn("back", "Back", "Esc")}${btn("fighter", "Choose fighter", "C")}${btn("play", "Fight", "Enter", "primary")}</div>`;
+    <p class="fine">Numbers: +${D.comboStep * 100}% power per clean word, combo level every ${w.wordsPerCombo} words, healing ${D.healPerWpm} HP a second per wpm, counter ${D.counter.damagePerWord} HP per lost combo word (up to ${D.counter.maxDamage}), ultimate ${U.damage} damage and a ${U.stun} second stun (${U.sloppyDamage} if sloppy), needs a combo of ${w.comboRequired * w.wordsPerCombo}.</p>
+
+    <h3 class="sec">Backspace Brawl</h3>
+    <div class="steps">
+      ${step(1, "Six buttons", `Three punches and three kicks, light, medium and heavy, like an arcade fighter. Light is fast and short, heavy is slow and hits hard. Crouch to go low, jump to hit from the air.`)}
+      ${step(2, "Chain and cancel", `Press a light attack, then a medium, then a heavy while the hit is landing, and they chain. A special can cancel the end of a normal attack, so a combo can finish with a fireball.`)}
+      ${step(3, "Motions", `Down, down forward, forward plus a punch throws a fireball. Forward, down, down forward plus a punch is the rising uppercut. Repeat the fireball motion twice for the super (${BR.superCost}% meter). Light punch and light kick together throw an opponent who is blocking.`)}
+      ${step(4, "Dash and block", `Tap forward or back twice to dash. Hold back to block, and add down to block low attacks. On a phone or a controller, the pad has buttons for the motions.`, "ult")}
+    </div>
+
+    <h3 class="sec">Modes</h3>
+    <dl class="legend">
+      ${row("Play", "A private online room with a friend. The host picks typing or Backspace Brawl, rounds and a timer.")}
+      ${row("Offline", "<b>Bots</b>: a match against one bot. <b>Endless</b>: one bot, no timer, a running score. <b>Practice</b>: a dummy you set up.")}
+      ${row("Backspace Brawl", "Vs a bot or online. Four attack buttons, a projectile, a rising move and a super, plus finisher strings that are different for every fighter.")}
+      ${row("Word submit", "<b>On</b>: press Space after each word. <b>Off</b>: a word ends when it is exactly right. <b>Mix</b>: each player keeps their own choice.")}
+    </dl>
+
+    <h3 class="sec">Reading the screen</h3>
+    <dl class="legend">
+      ${row("HP bars", "Top corners. Yours is on the left, theirs on the right.")}
+      ${row("EDGE", "Who is winning the typing exchange right now, in HP per second.")}
+      ${row("WPM and POWER", "Your speed, and your speed plus combo and counter bonuses.")}
+      ${row("Keys", "The pause button is top right in a fight.")}
+    </dl>
+    <div class="btn-row">${btn("back", "Back", "Esc", "primary")}</div>`;
   keyline([]);
 }
 
-// The bot of the selected level, and the weapons, colors and HUD for a new match.
-function begin() {
+// ---------- Starting an offline run ----------
+// begin() starts a new run of the mode picked on the Offline screen (also Rematch and Restart).
+function begin() { if (run && run.kind === "brawl") startBrawlOffline(); else startOffline(offlineMode); }
+function startOffline(kind) {
+  cancelRoundTimer();
+  run = { kind, rules: Object.assign(rulesNow(), { endless: false }), wins: [0, 0], round: 1 };
+  startRound();
+}
+// One fight of the run: a round of a bots match, the next Endless round, or the practice session.
+function startRound() {
   online.active = false;
   online.screenState = "idle";
   modals = [];
   renderModal();
-  botCfg = botCfgFor(botIndex);
+  hideBanner();
+  let card, charIdx;
+  if (run.kind === "practice") { card = Modes.dummyCard(practice); charIdx = 0; }
+  else { card = null; charIdx = botIndex; }
+  botCfg = card ? Object.assign(card.wpm ? Bot.cfgFor(card) : card, { beatAt: card.wpm }) : botCfgFor(botIndex);
+  const foeChar = botCharFor(charIdx);
   const seed = (Math.random() * 1e9) | 0;
-  duel.start(seed);
-  matchSpace = settings.wordSubmit; // changing it in the pause menu applies from the next fight
-  rec = new Stats.Recorder({ mode: matchSpace ? "space" : "auto", seed, bot: botCfg.name, botIdx: botIndex, beatAt: botCfg.beatAt,
-    char: charKey, foeChar: botCharFor(botIndex) });
+  applySeat(settings.side === "right");
+  duel.start(seed, undefined, Modes.duelOpts(run.kind, run.rules, practice, settings.eHurt));
+  matchSpace = !Modes.autoEnds(run.rules.words, settings.wordSubmit); // changing it in the pause menu applies from the next fight
+  rec = run.kind === "practice" || (run.kind === "endless" && !settings.eHurt) ? null : new Stats.Recorder({ mode: matchSpace ? "space" : "auto", seed, bot: botCfg.name, botIdx: charIdx, beatAt: botCfg.beatAt,
+    char: charKey, foeChar });
   setPanelChar(0, charKey, duel.typists[0].weapon);
-  setPanelChar(1, botCharFor(botIndex), duel.typists[1].weapon);
+  setPanelChar(1, foeChar, duel.typists[1].weapon);
+  panels[0].name.textContent = "YOU";
   panels[1].name.textContent = botCfg.name;
   applyLooks(); // cosmetic; online, the color will travel with the seed
-  bot = new Bot(botCfg, duel.streams[1], (events, t) => duel.handleEvents(1, events, t));
-  bot.nextKeyAt = 0.6; // a human like pause before the bot starts
+  bot = botCfg.wpm ? new Bot(botCfg, duel.streams[1], (events, t) => duel.handleEvents(1, events, t)) : null; // a dummy at 0 wpm just stands there
+  if (bot) bot.nextKeyAt = 0.6; // a human like pause before the bot starts
+  if (!rec) lastRecord = null;
   view = new StreamView(duel.streams[0]);
   traceNext = 0;
   showScreen(null);
+}
+
+// The round (or the whole fight) is decided: update the score, then show the next round or the result screen.
+function roundOver() {
+  const w = duel.result.winner; // 0 = you
+  if (rec) {
+    rec.sample(duel);
+    lastRecord = rec.finish(duel);
+    if (!Stats.add(lastRecord)) toast("This match could not be saved to your stats: the browser's storage is full or blocked.");
+    const st = duel.typists[0].stats, keys = st.correct + st.wrong;
+    if (keys > 0 && duel.t > 5 && st.lastKeyAt > st.firstKeyAt) saveHistory(st.correct / 5 / ((st.lastKeyAt - st.firstKeyAt) / 60)); // for MATCH ME
+  }
+  if (!run) { showResult(); return; }
+  if (run.kind === "endless") {
+    run.wins[w]++; run.round++;
+    showBanner(w === 0 ? "YOU WIN THE ROUND" : "YOU LOSE THE ROUND", `${run.wins[0]} - ${run.wins[1]}, next round starting`);
+    Sfx.play(w === 0 ? "win" : "lose");
+    cancelRoundTimer(); roundTimer = setTimeout(startRound, MODE.roundGap * 1000);
+    return;
+  }
+  if (run.kind === "practice") { run.over = true; showResult(); return; }
+  run.wins[w]++; run.round++;
+  const st = Modes.status(run.rules, run.wins);
+  run.over = st.over;
+  if (!st.over) {
+    showBanner(`ROUND ${run.round - 1} ${w === 0 ? "WON" : "LOST"}`, `${run.wins[0]} - ${run.wins[1]}`);
+    Sfx.play(w === 0 ? "win" : "lose");
+    cancelRoundTimer();
+    if (run.kind === "online") { if (online.role === "host") roundTimer = setTimeout(() => { if (online.connected) hostStartOnline(true); }, MODE.roundGap * 1000); }
+    else roundTimer = setTimeout(startRound, MODE.roundGap * 1000);
+    return;
+  }
+  showResult();
 }
 
 function resetOnlineState(keepNet) {
@@ -546,6 +754,7 @@ function resetOnlineState(keepNet) {
 
 function openOnline() {
   online.profile = onlineProfile();
+  if (isPhone() && settings.mGame !== "brawl") { settings.mGame = "brawl"; saveSettings(); }
   const room = new URLSearchParams(location.search).get("room");
   renderOnline();
   if (room && onlineAvailable() && !online.net) {
@@ -627,24 +836,39 @@ function onlineMessage(msg) {
     if (online.role === "host" && online.localReady && online.remoteReady) hostStartOnline();
   } else if (msg.t === "start") {
     guestStartOnline(msg);
+  } else if (msg.t === "bin" && online.role === "host") {
+    BrawlGame.onInput(msg);
   } else if (msg.t === "keys" && online.role === "host") {
     for (const ev of msg.events) {
+      // The guest may only end a word by itself when the room's word mode allows it and the word really is done.
+      if (ev.k === "AutoSubmit" && (!run || run.rules.words === "on" || !duel.streams[1].autoEnds())) continue;
       const events = applyInputToSide(1, ev.k);
       if (events.length) duel.handleEvents(1, events, duel.t);
     }
+    online.snapDirty = true; // tell the guest the result without waiting for the next periodic snapshot
+  } else if (msg.t === "state" && online.role === "guest" && BrawlGame.active) {
+    BrawlGame.onSnapshot(msg);
   } else if (msg.t === "state" && online.role === "guest") {
+    if (msg.mid !== online.mid) return; // a late message of the round before
     duel.applySnapshot(msg.s, true);
     if (duel.phase === "fight" && duel.t >= traceNext) { online.trace.push([duel.wpmNow[0], duel.wpmNow[1], duel.typists[0].hp, duel.typists[1].hp]); traceNext += 0.5; }
     if (duel.phase === "over" && !shownResult) online.waitingResult = msg.s.result || { winner: 0 };
   } else if (msg.t === "result" && online.role === "guest") {
+    if (!online.active) return;
+    if (BrawlGame.active) { BrawlGame.onResult(msg); return; }
     duel.result = { winner: 1 - msg.winner };
     duel.phase = "over";
     online.waitingResult = duel.result;
   } else if (msg.t === "rematch") {
     online.remoteRematch = msg.want;
     if (online.role === "host" && online.localRematch && online.remoteRematch) hostStartOnline();
-    resultBots();
+    refreshResult();
   } else if (msg.t === "ping") online.net.send(Protocol.pong(msg.id, msg.ts));
+  else if (msg.t === "pong") {
+    const rtt = performance.now() - msg.ts;
+    online.rtt = online.rtt ? online.rtt * 0.7 + rtt * 0.3 : rtt; // smoothed round trip, ms
+    updateOnlineBadge();
+  }
 }
 
 function cryptoSeed() {
@@ -666,7 +890,7 @@ function applyOnlineLooks(fighters) {
   renderer.menuSpar = fighters;
 }
 
-function startOnlineDuel(seed, hostFighter, guestFighter, hostName, guestName) {
+function startOnlineDuel(seed, hostFighter, guestFighter, hostName, guestName, rules, round, wins, mid) {
   clearRoomInput();
   online.active = true;
   online.screenState = "playing";
@@ -674,20 +898,29 @@ function startOnlineDuel(seed, hostFighter, guestFighter, hostName, guestName) {
   online.seq = 0;
   online.snapN = 0;
   online.snapNext = 0;
+  online.startedAt = performance.now();
+  online.lastSnapAt = 0;
+  online.snapDirty = false;
+  online.pingAt = 0;
+  online.rtt = 0;
   online.keyQueue = [];
   online.trace = [];
   online.localRematch = false;
   online.remoteRematch = false;
   online.hostSentResult = false;
   online.waitingResult = null;
+  online.mid = mid;
+  cancelRoundTimer(); hideBanner();
+  run = { kind: "online", rules, wins, round };
   shownResult = false;
   rec = null;
   lastRecord = null;
   traceNext = 0;
-  matchSpace = settings.wordSubmit;
+  matchSpace = !Modes.autoEnds(rules.words, settings.wordSubmit);
   bot = null;
   botCfg = { name: online.role === "guest" ? hostName : guestName, beatAt: 0 };
-  duel.start(seed, ["medium", "medium"]);
+  applySeat(false);
+  duel.start(seed, ["medium", "medium"], Modes.duelOpts("online", rules));
   if (online.role === "guest") duel.streams = [duel.streams[1], duel.streams[0]];
   const localFighters = online.role === "guest" ? [guestFighter, hostFighter] : [hostFighter, guestFighter];
   setPanelChar(0, localFighters[0], duel.typists[0].weapon);
@@ -701,16 +934,42 @@ function startOnlineDuel(seed, hostFighter, guestFighter, hostName, guestName) {
   showScreen(null);
 }
 
-function hostStartOnline() {
+// An online Brawl fight (or its next round). Wins stay in seat order, [host, guest], on both screens.
+function startOnlineBrawl(seed, rules, round, wins, mid, fighters) {
+  clearRoomInput();
+  online.active = true; online.screenState = "playing";
+  online.seed = seed >>> 0; online.startedAt = performance.now();
+  online.pingAt = 0; online.rtt = 0;
+  online.localRematch = false; online.remoteRematch = false;
+  online.hostSentResult = false; online.waitingResult = null;
+  online.mid = mid;
+  cancelRoundTimer(); hideBanner();
+  run = { kind: "online", game: "brawl", rules, wins, round };
+  shownResult = false; rec = null; lastRecord = null; bot = null;
+  modals = []; renderModal();
+  const side = online.role === "guest" ? 1 : 0;
+  BrawlGame.begin({ mode: "online", side, seed, chars: [safeChar(fighters[0]), safeChar(fighters[1])], names: side === 0 ? ["YOU", "OPPONENT"] : ["OPPONENT", "YOU"] });
+}
+
+// The host starts a new match, or (`next`) the next round of the match in progress.
+function hostStartOnline(next) {
   const peer = online.peerProfile || { name: "OPPONENT", fighter: CH.defaultChar };
   const seed = cryptoSeed();
   const hostFighter = safeChar(online.profile.fighter), guestFighter = safeChar(peer.fighter);
-  online.net.send(Protocol.start(seed, [hostFighter, guestFighter], ["PLAYER", peer.name], CONFIG.duel.countdown));
-  startOnlineDuel(seed, hostFighter, guestFighter, "PLAYER", peer.name);
+  const cont = next && run && run.kind === "online";
+  const rules = cont ? run.rules : rulesNow(), round = cont ? run.round : 1, wins = cont ? run.wins.slice() : [0, 0];
+  const game = isPhone() ? "brawl" : cont ? (run.game || "typing") : settings.mGame;
+  const mid = (online.mid || 0) + 1;
+  online.net.send(Protocol.start(seed, [hostFighter, guestFighter], ["PLAYER", peer.name], CONFIG.duel.countdown, rules, round, wins, mid, game));
+  if (game === "brawl") startOnlineBrawl(seed, rules, round, wins, mid, [hostFighter, guestFighter]);
+  else startOnlineDuel(seed, hostFighter, guestFighter, "PLAYER", peer.name, rules, round, wins, mid);
 }
 
 function guestStartOnline(msg) {
-  startOnlineDuel(msg.seed, safeChar(msg.fighters[0]), safeChar(msg.fighters[1]), msg.names[0], msg.names[1]);
+  const rules = Modes.cleanRules(msg.rules);
+  if (isPhone() && msg.game !== "brawl") { toast("This room plays the typing game. Phones play Backspace Brawl only."); act("online-leave"); return; }
+  if (msg.game === "brawl") { startOnlineBrawl(msg.seed, rules, msg.round, msg.wins.slice(), msg.mid, msg.fighters); return; }
+  startOnlineDuel(msg.seed, safeChar(msg.fighters[0]), safeChar(msg.fighters[1]), msg.names[0], msg.names[1], rules, msg.round, [msg.wins[1], msg.wins[0]], msg.mid);
 }
 
 function toggleOnlineReady() {
@@ -721,9 +980,16 @@ function toggleOnlineReady() {
 }
 
 function goMenu() {
+  cancelRoundTimer(); hideBanner();
+  if (run && run.kind === "online") titleView = "home";
+  else if (run && run.kind === "brawl") titleView = "brawl";
+  BrawlGame.stop();
+  run = null;
   if (online.net) online.net.close();
   online.net = null;
   resetOnlineState(true);
+  online.rtt = 0;
+  updateOnlineBadge();
   modals = [];
   renderModal();
   duel.phase = "menu";
@@ -755,14 +1021,20 @@ function onlineChart(you, foe) {
 }
 
 function showResult() {
+  hideBanner();
+  if (online.active) online.screenState = "result";
   showScreen("result");
-  const youWon = duel.result.winner === 0;
+  const practiceRun = run && run.kind === "practice";
+  const multi = run && run.kind !== "practice" && (run.rules.rounds > 1);
+  const youWon = practiceRun ? false : multi ? Modes.status(run.rules, run.wins).winner === 0 : duel.result.winner === 0;
   $("ko-title").className = youWon ? "win" : "lose";
-  $("ko-title").textContent = youWon ? "YOU WIN" : "YOU LOSE";
+  $("ko-title").textContent = practiceRun ? "KNOCKED OUT" : youWon ? "YOU WIN" : "YOU LOSE";
   Sfx.play(youWon ? "win" : "lose");
-  $("ko-sub").textContent = isOnlineMatch()
-    ? `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name}, unranked online`
-    : `K.O. after ${duel.t.toFixed(1)} s against ${botCfg.name} (win at about ${Math.round(botCfg.beatAt)} WPM)`;
+  const how = duel.result.byTime ? `Time up after ${duel.t.toFixed(1)} s` : `K.O. after ${duel.t.toFixed(1)} s`;
+  $("ko-sub").textContent = practiceRun ? `${how} against the dummy`
+    : multi ? `Match ${run.wins[0]} to ${run.wins[1]} over ${run.round - 1} rounds against ${botCfg.name}`
+    : isOnlineMatch() ? `${how} against ${botCfg.name}, unranked online`
+    : `${how} against ${botCfg.name} (about ${Math.round(botCfg.beatAt)} wpm)`;
   const col = (t, i, name) => `<div class="rcol panel" style="--id:var(${i ? "--foe" : "--you"})"><h3>${name}</h3><dl>
     <dt>Average WPM</dt><dd>${avgWpm(t)}</dd><dt>Accuracy</dt><dd>${accuracy(t)}</dd>
     <dt>Best combo</dt><dd>x${t.stats.bestCombo}</dd><dt>Ultimates landed</dt><dd>${t.stats.ultimates}</dd></dl></div>`;
@@ -773,18 +1045,24 @@ function showResult() {
   resultBots();
 }
 
+// The result screen of whichever game just ended.
+function refreshResult() { if (screen === "bresult") BrawlGame.renderResult(); else resultBots(); }
+
 function resultBots() {
   if (isOnlineMatch()) {
     $("result-bots").innerHTML = `<div class="card-label"><span>Online room</span><span>${online.localRematch ? "Waiting" : "Ready for rematch"}</span></div>` +
       `<button class="bot-chip pick ${online.remoteRematch ? "sel" : ""}" tabindex="-1"><b>${botCfg.name}</b>${online.remoteRematch ? "wants rematch" : "not ready"}</button>`;
     $("result-btns").innerHTML = btn("rematch", online.localRematch ? "Waiting" : "Rematch", "Enter", online.localRematch ? "" : "primary") + btn("menu", "Leave", "Esc");
-    keyline([keyBtn("settings", "S", "settings"), keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+    keyline([keyBtn("view", "F2", "words: " + viewName())]);
+  } else if (run && run.kind === "practice") {
+    $("result-bots").innerHTML = practiceHtml();
+    $("result-btns").innerHTML = btn("rematch", "Again", "Enter", "primary") + btn("stats", "My stats", "T") + btn("menu", "Main menu", "Esc");
+    keyline([keyBtn("view", "F2", "words: " + viewName())]);
   } else {
-    $("result-bots").innerHTML = `<div class="card-label"><span>Pick another opponent</span><span>${botKeys()}</span></div>` +
-      BOTS.map((b, i) => `<button class="bot-chip pick ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1"><b>${b.name}</b>${Math.round(botCfgFor(i).beatAt)} wpm</button>`).join("");
+    $("result-bots").innerHTML = `<div class="card-label"><span>Pick another opponent</span><span></span></div>` +
+      BOTS.map((b, i) => { const lk = b.match && !matchUnlocked(); return `<button class="bot-chip pick ${i === botIndex ? "sel" : ""}" data-act="bot:${i}" tabindex="-1" ${lk ? "disabled" : ""}><b>${b.name}</b>${lk ? "locked" : Math.round(botCfgFor(i).beatAt) + " wpm"}</button>`; }).join("");
     $("result-btns").innerHTML = btn("rematch", "Rematch", "Enter", "primary") + btn("nextbot", "Next opponent", botKeys()) + btn("stats", "My stats", "T") + btn("menu", "Main menu", "Esc");
-    keyline([keyBtn("fighter", "C", "fighter"), keyBtn("howto", "H", "how to play"), keyBtn("settings", "S", "settings"),
-      keyBtn("view", "F2", "words: " + viewName()), keyBtn("fullscreen", "F", "fullscreen")]);
+    keyline([keyBtn("view", "F2", "words: " + viewName())]);
   }
 }
 
@@ -807,11 +1085,47 @@ function sizePreview() {
   cv.height = Math.round(520 * uiScale * dpr);
 }
 
+// ---------- Creator screen (js/creator.js builds the form; this wires it to the screen) ----------
+function sizeCreatorPreview() {
+  const cv = $("creator-preview"); if (!cv) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.width = Math.round(446 * uiScale * dpr);
+  cv.height = Math.round(520 * uiScale * dpr);
+}
+function openCreator() {
+  if (screen === "fighter") creatorBack = "fighter"; else creatorBack = screen === "title" ? "title" : "fighter";
+  showScreen("creator");
+  const i = Creator.isCustom(charKey) ? +charKey[2] - 1 : null;
+  Creator.open($("scr-creator"), i);
+  sizeCreatorPreview();
+}
+function closeCreator() {
+  Creator.close();
+  ROSTER = Chars.ORDER.concat(Creator.keys());
+  if (creatorBack === "title") renderTitle(); else openFighter();
+}
+function creatorAct(x, y) {
+  Creator.act(x, y);
+  sizeCreatorPreview();
+}
+function creatorSave(use) {
+  const key = Creator.commit();
+  toast(use ? "Fighter saved and ready." : "Fighter saved.");
+  if (use) {
+    charKey = key;
+    try { localStorage.setItem(CH.storageKey, charKey); } catch (e) { /* not saved, still works */ }
+    applyLooks();
+    closeCreator();
+  } else sizeCreatorPreview();
+}
+let creatorBack = "fighter";
+
 function openFighter() {
   back = screen === "result" ? "result" : screen === "online" ? "online" : "title";
   pickIndex = Math.max(0, ROSTER.indexOf(charKey));
   showScreen("fighter");
-  $("chars").innerHTML = ROSTER.map((k, i) => { const d = charDef(k); return `<button class="char pick" data-act="char:${i}" tabindex="-1"><b>${d.name}</b><span>${d.title}</span></button>`; }).join("");
+  $("chars").innerHTML = ROSTER.map((k, i) => { const d = charDef(k); return `<button class="char pick" data-act="char:${i}" tabindex="-1"><b>${d.name}</b><span>${d.title}</span></button>`; }).join("") +
+    `<button class="char pick char-new" data-act="creator" tabindex="-1"><b>+ Create</b><span>Your own moveset</span></button>`;
   $("fighter-btns").innerHTML = btn("back", "Back", "Esc") + btn("confirm", "Use this fighter", "Enter", "primary");
   keyline([keyBtn("prev", "Left", "previous"), keyBtn("next", "Right", "next"), keyBtn("down", "Up / Down", "row")]);
   sizePreview();
@@ -820,7 +1134,7 @@ function openFighter() {
 
 function renderFighter() {
   const k = ROSTER[pickIndex], d = charDef(k), w = Anim.W[d.weapon];
-  [...document.querySelectorAll(".char")].forEach((el, i) => {
+  [...document.querySelectorAll(".char:not(.char-new)")].forEach((el, i) => {
     el.classList.toggle("sel", i === pickIndex);
     el.classList.toggle("saved", ROSTER[i] === charKey);
   });
@@ -854,7 +1168,13 @@ function openHowto() {
 function closeHowto() { if (back === "result") { showScreen("result"); resultBots(); } else renderTitle(); }
 
 function pickBot(i) {
-  botIndex = (i + BOTS.length) % BOTS.length;
+  i = (i + BOTS.length) % BOTS.length;
+  if (BOTS[i].match && !matchUnlocked()) {
+    toast("MATCH ME unlocks after your first finished match: it copies your own speed.");
+    if (screen === "title") renderTitle();
+    return;
+  }
+  botIndex = i;
   if (screen === "title") renderTitle(); else if (screen === "result") resultBots();
   applyLooks();
 }
@@ -872,7 +1192,7 @@ function renderModal() {
         `<p class="modal-note">Online fights keep running while this menu is open.</p>`
       : `<h2 class="screen-title">Paused</h2>` +
         mbtn("resume", "Resume", "Esc", "primary") + mbtn("restart", "Restart", "R") + mbtn("settings", "Settings", "S") + mbtn("quit", "Quit to menu", "Q") +
-        `<p class="modal-note">The fight is frozen: the clock, the bot and your typing all wait for you.</p>`;
+        `<p class="modal-note">The fight is frozen: the clock and the bot wait for you.</p>`;
   } else if (top === "confirm") {
     $("mod-confirm").innerHTML = `<h2 class="screen-title">Quit to menu?</h2><p>This fight ends without a result.</p>` +
       `<div class="btn-row">${btn("quit-no", "Keep fighting", "Esc", "primary")}${btn("quit-yes", "Quit", "Enter")}</div>`;
@@ -903,13 +1223,25 @@ const SETTINGS_TABS = [
     { id: "view", label: "Where words appear", hint: "Over-head: the word floats above each fighter. Classic: a typing box at the bottom.",
       opts: [["overhead", "Over-head"], ["classic", "Classic"]], get: () => viewMode, set: (v) => setView(v) },
     toggleRow("damageNumbers", "Damage numbers", "Show the HP gained or lost next to each fighter."),
+    { id: "side", label: "Starting side", hint: "Which side of the arena you stand on against a bot, in typing fights and Backspace Brawl: left (like player 1) or right (like player 2). Online, the host is on the left.",
+      opts: [["left", "Left"], ["right", "Right"]], get: () => settings.side, set: (v) => { settings.side = v; saveSettings(); } },
+    { id: "hand", label: "Playing hand", hint: "Backspace Brawl. Right hand: arrow keys move, A S Z X attack. Left hand: W A S D move, ; L / . attack. The touch buttons swap sides too.",
+      opts: [["right", "Right"], ["left", "Left"]], get: () => settings.hand, set: (v) => { settings.hand = v; saveSettings(); BrawlInput.setHand(v); BrawlInput.setLayout(v); } },
+  ] },
+  { name: "Match", rows: [
+    { id: "mRounds", label: "Rounds", hint: "How many rounds in a match (best of). A tie plays one more. Online, the host decides.",
+      opts: MODE.roundSteps.map((n) => [n, String(n)]), get: () => settings.mRounds, set: (v) => { settings.mRounds = v; } },
+    { id: "mTimer", label: "Round timer", hint: "When time runs out the higher HP wins the round.",
+      opts: timerOpts(), get: () => settings.mTimer, set: (v) => { settings.mTimer = v; } },
+    { id: "mEndless", label: "Endless (online)", hint: "Online only: nobody loses HP and nobody is knocked out. Offline Endless is its own mode.",
+      opts: ON_OFF, get: () => settings.mEndless, set: (v) => { settings.mEndless = v; } },
+    { id: "mWords", label: "Match word submit", hint: WORD_HINT, opts: wordOpts, get: () => settings.mWords, set: (v) => { settings.mWords = v; } },
+    { type: "note", html: "These rules apply to the next match you start: offline Bots, and online when you are the host. Endless and Practice have no rounds or timer." },
   ] },
   { name: "Typing", rows: [
-    { id: "wordSubmit", label: "Space ends a word", hint: "On: press Space (or Enter) after each word. Off: a word ends by itself when it is exactly right.",
+    { id: "wordSubmit", label: "Your word submit", hint: "On: press Space or Enter after each word. Off: a word ends by itself when it is exactly right.",
       opts: ON_OFF, get: () => settings.wordSubmit, set: (v) => { settings.wordSubmit = v; } },
-    { type: "note", html: "<b>On</b> works like Monkeytype. <b>Off</b> saves a key per word: the moment a word is typed exactly right, the caret jumps to the next one. " +
-      "A word with a wrong letter still needs <kbd>Space</kbd>, or <kbd>Backspace</kbd> and a fix. Your speed is counted the same either way " +
-      "(the Space you skip is not counted), but the two modes are different races, so your stats keep them apart." },
+    { type: "note", html: "A wrong letter skips the word in both modes. Off saves a key per word. Speed is counted the same either way, but the two are different races, so your stats keep them apart. In a match set to Mix, this is the setting you play with." },
   ] },
   { name: "Graphics", rows: [
     { type: "head", label: "Speed" },
@@ -947,7 +1279,7 @@ const SETTINGS_TABS = [
     { id: "hudOpacity", type: "range", label: "HUD panel opacity", min: SET.hudOpacity.min, max: SET.hudOpacity.max, step: SET.hudOpacity.step,
       hint: "Lower lets you see more of the arena through the panels.", get: () => settings.hudOpacity, set: (v) => { settings.hudOpacity = v; }, fmt: pct },
     toggleRow("showWpm", "Show WPM", "Your speed and the opponent's, in the bottom corners."),
-    toggleRow("showPower", "Show power", "Power is your WPM plus your combo bonus."),
+    toggleRow("showPower", "Show power", "Power is your typing speed plus a small bonus for every clean word in a row."),
     toggleRow("showEdge", "Show the edge bar", "The tug of war at the top that shows who is winning the exchange."),
   ] },
   { name: "Sound", rows: [
@@ -960,17 +1292,15 @@ const SETTINGS_TABS = [
   { name: "Keys", rows: [] },
 ];
 const isRow = (r) => !r.type || r.type === "range" || r.type === "button";   // rows the keyboard can focus
-function keyRows() { return [
-  ["Typing", settings.wordSubmit ? "Letters type, <kbd>Space</kbd> or <kbd>Enter</kbd> ends a word, <kbd>Backspace</kbd> fixes a letter" :
-    "Letters type, a word ends when it is exactly right (or press <kbd>Space</kbd>), <kbd>Backspace</kbd> fixes a letter"],
-  ["Pause", "<kbd>Esc</kbd> in a fight (leaving the tab pauses too)"],
-  ["Pause menu", "<kbd>Esc</kbd> resume, <kbd>R</kbd> restart, <kbd>S</kbd> settings, <kbd>Q</kbd> quit"],
-  ["Title and result", "<kbd>Enter</kbd> fight, <kbd>1</kbd> to <kbd>7</kbd> opponent, <kbd>C</kbd> fighter, <kbd>H</kbd> how to play"],
-  ["", "<kbd>T</kbd> stats, <kbd>S</kbd> settings, <kbd>F2</kbd> view, <kbd>F</kbd> fullscreen, <kbd>Esc</kbd> menu (result)"],
-  ["Fighter", "<kbd>Left</kbd> <kbd>Right</kbd> pick, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Enter</kbd> confirm, <kbd>Esc</kbd> back"],
-  ["Settings", "<kbd>1</kbd> to <kbd>7</kbd> or <kbd>Tab</kbd> tab, <kbd>Up</kbd> <kbd>Down</kbd> row, <kbd>Left</kbd> <kbd>Right</kbd> change"],
-  ["Stats", "<kbd>Up</kbd> <kbd>Down</kbd> scroll, <kbd>Esc</kbd> or <kbd>T</kbd> back"],
-  ["Mouse", "Click any button or key chip. Typing stays on the keyboard."],
+function keyRows() { const L = BrawlInput.labels(); return [
+  ["Typing fight", settings.wordSubmit ? "Letters type, Space or Enter ends a word, Backspace fixes a letter." :
+    "Letters type, a word ends when it is exactly right (or press Space), Backspace fixes a letter."],
+  ["Backspace Brawl move", L.move + ", up to jump, down to crouch, hold back to block."],
+  ["Backspace Brawl attacks", `High: ${L.high}. Low: ${L.low}.`],
+  ["Backspace Brawl specials", L.specials + "."],
+  ["Backspace Brawl finishers", "Land a hit, then press the buttons of your fighter's string in order. Each fighter has three, listed in the Backspace Brawl menu."],
+  ["Any fight", "Escape pauses, and leaving the tab pauses too. The pause menu has restart, settings and quit."],
+  ["Mouse and touch", "Every button works by click or tap. Typing stays on the keyboard."],
 ]; }
 
 function openSettings() {
@@ -1151,7 +1481,7 @@ function themeAct(a, x) {
       box.select();
       try { navigator.clipboard.writeText(box.value).then(() => toast("Theme code copied."), () => toast("Press Ctrl+C to copy the code.")); } catch (err) { toast("Press Ctrl+C to copy the code."); }
     } else if (Themes.importCode(box.value)) { toast("Theme applied."); renderSettings(); }
-    else toast("That is not a Type Boxing theme code. It looks like TB1. followed by 66 letters and digits.");
+    else toast("That is not a CounterType theme code. It looks like TB1. followed by 66 letters and digits.");
   } else if (a === "bgmode") { Themes.setBg({ mode: x }); renderSettings(); }
   else if (a === "bg") {
     if (x === "clear") Themes.clearBg().then(renderSettings);
@@ -1160,18 +1490,37 @@ function themeAct(a, x) {
 }
 
 // ---------- Actions: the one place the keyboard and the mouse both go through ----------
+// A choice made with a seg button in the menus: a match setting ("mRounds") or a practice value ("p.wpm").
+function setOpt(key, raw) {
+  const v = raw === "true" ? true : raw === "false" ? false : /^-?\d+(\.\d+)?$/.test(raw) ? Number(raw) : raw;
+  if (key.startsWith("p.")) { practice = Modes.cleanPractice(Object.assign({}, practice, { [key.slice(2)]: v })); writeJson(MODE.practice.storageKey, practice); }
+  else if (key in settings) { settings[key] = v; saveSettings(); }
+  if (topModal() === "settings") renderSettings();
+  else if (screen === "title") renderTitle();
+  else if (screen === "online") renderOnline();
+  else if (screen === "result") resultBots();
+}
+
 function act(name) {
   const [a, x, y] = name.split(":");
   Sfx.play("ui");
   const top = topModal();
   switch (a) {
-    case "play": begin(); break;
+    case "play": if (isPhone()) break; if (!top && screen === "title") { openOnline(); } else if (!top && screen === "howto") openOnline(); break;
+    case "start": if (!top && screen === "title") begin(); break;
+    case "offline": if (!isPhone() && !top && (screen === "title" || screen === "online")) { if (screen === "online") goMenu(); titleView = "offline"; renderTitle(); } break;
+    case "mode": if (!top && screen === "title") { offlineMode = x; renderTitle(); } break;
+    case "brawl": if (!top && screen === "title") { titleView = "brawl"; renderTitle(); } break;
+    case "bbot": if (!top && screen === "title") { brawlBot = +x; saveBrawl(); renderTitle(); } break;
+    case "bstart": if (!top && screen === "title") { saveBrawl(); startBrawlOffline(); } break;
+    case "bonline": if (!top && screen === "title") { settings.mGame = "brawl"; saveSettings(); openOnline(); } break;
+    case "opt": setOpt(x, y); break;
     case "rematch":
       if (isOnlineMatch()) {
         online.localRematch = true;
         if (online.net) online.net.send(Protocol.rematch(true));
         if (online.role === "host" && online.remoteRematch) hostStartOnline();
-        resultBots();
+        refreshResult();
       } else begin();
       break;
     case "online": if (!top && screen === "title") openOnline(); break;
@@ -1184,17 +1533,25 @@ function act(name) {
     case "settings": openSettings(); break;
     case "fullscreen": setFullscreen(!isFullscreen()); break;
     case "view": toggleView(); if (screen === "title") renderTitle(); else if (screen === "result") resultBots(); break;
-    case "nextbot": pickBot(botIndex + 1); break;
+    case "nextbot": pickBot(botIndex + 1 === BOTS.length - 1 && !matchUnlocked() ? 0 : botIndex + 1); break;
     case "bot": pickBot(+x); break;
     case "menu": goMenu(); break;
     case "back":
       if (top) closeModal();
       else if (screen === "howto") closeHowto();
       else if (screen === "stats") { if (!StatsPage.back()) closeStats(); }
+      else if (screen === "creator") closeCreator();
       else if (screen === "fighter") closeFighter(false);
       else if (screen === "online") goMenu();
+      else if (screen === "title" && (titleView === "offline" || titleView === "brawl")) { titleView = "home"; renderTitle(); }
       break;
     case "confirm": closeFighter(true); break;
+    case "creator": if (!top && (screen === "fighter" || screen === "title")) openCreator(); break;
+    case "cr": if (screen === "creator") creatorAct(x, y); break;
+    case "crsave": if (screen === "creator") creatorSave(false); break;
+    case "cruse": if (screen === "creator") creatorSave(true); break;
+    case "crdelete": if (screen === "creator") { Creator.remove(); if (Creator.isCustom(charKey) && !Creator.keys().includes(charKey)) { charKey = CH.defaultChar; try { localStorage.setItem(CH.storageKey, charKey); } catch (e) { /* ok */ } } sizeCreatorPreview(); toast("Fighter deleted."); } break;
+    case "crback": if (screen === "creator") closeCreator(); break;
     case "prev": stepPick(-1); break;
     case "next": stepPick(1); break;
     case "up": stepPick(-PICK_COLS); break;
@@ -1230,6 +1587,7 @@ ui.addEventListener("click", (e) => {
 // Each screen maps its keys to the same actions the buttons use.
 function menuKey(e) {
   const k = e.key, lower = k.length === 1 ? k.toLowerCase() : k;
+  if (screen === "creator") { if (k === "Escape") act("crback"); return; }
   if (screen === "fighter") {
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); act(k === "ArrowUp" ? "up" : "down"); }
     else if (k === "ArrowLeft") { e.preventDefault(); act("prev"); }
@@ -1243,6 +1601,13 @@ function menuKey(e) {
     else if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); $("scr-stats").scrollBy({ top: k === "ArrowUp" ? -90 : 90 }); }
     return;
   }
+  if (screen === "bresult") {
+    if (k === "Enter") act("rematch");
+    else if (k === "Escape") act("menu");
+    else if (lower === "s") act("settings");
+    else if (lower === "f") act("fullscreen");
+    return;
+  }
   if (screen === "howto") {
     if (k === "Escape" || lower === "h") act("back");
     else if (lower === "c") act("fighter");
@@ -1250,7 +1615,8 @@ function menuKey(e) {
     return;
   }
   if (screen === "online") {
-    if (k === "Escape") act(online.connected ? "online-leave" : "back");
+    if (lower === "o" && !online.connected) act("offline");
+    else if (k === "Escape") act(online.connected ? "online-leave" : "back");
     else if (lower === "c" && !online.connected) act("online-create");
     else if (lower === "j" && !online.connected) act("online-join");
     else if (lower === "f" && !online.connected) act("fighter");
@@ -1262,12 +1628,19 @@ function menuKey(e) {
     if (lower === "c") act("fighter");
     else if (lower === "h") act("howto");
     else if (lower === "t") act("stats");
-    else if (lower === "o" && screen === "title") act("online");
+    else if (lower === "o" && screen === "title" && titleView === "home") act("offline");
+    else if (lower === "b" && screen === "title" && titleView === "home") act("brawl");
+    else if (screen === "title" && titleView === "brawl" && lower === "n") act("bonline");
+    else if (screen === "title" && titleView === "brawl" && k >= "1" && k <= String(BR.bots.length)) act("bbot:" + (+k - 1));
+    else if (k === "Escape" && screen === "title" && titleView === "brawl") act("back");
+    else if (k === "Enter" && screen === "title" && titleView === "brawl") act("bstart");
+    else if (screen === "title" && titleView === "offline" && (lower === "b" || lower === "e" || lower === "p")) act("mode:" + (lower === "b" ? "bots" : lower === "e" ? "endless" : "practice"));
+    else if (k === "Escape" && screen === "title" && titleView === "offline") act("back");
     else if (lower === "s") act("settings");
     else if (lower === "f") act("fullscreen");
     else if (k === "F2") { e.preventDefault(); act("view"); }
-    else if (k >= "1" && k <= String(BOTS.length)) act("bot:" + (+k - 1));
-    else if (k === "Enter") act(screen === "result" ? "rematch" : "play");
+    else if (k >= "1" && k <= String(BOTS.length) && (screen === "result" || (titleView === "offline" && offlineMode !== "practice"))) act("bot:" + (+k - 1));
+    else if (k === "Enter") act(screen === "result" ? "rematch" : titleView === "offline" ? "start" : "play");
     else if (k === "Escape" && screen === "result") act("menu");
   }
 }
@@ -1307,8 +1680,9 @@ function applyInputToSide(side, key) {
 
 function queueOnlineKey(key) {
   if (!online.active || online.role !== "guest") return;
-  online.keyQueue.push({ k: key, lt: duel.t });
-  if (online.keyQueue.length >= CONFIG.net.maxKeysPerMessage) flushOnlineKeys();
+  // Real elapsed time, not the duel clock: the guest's duel clock only moves with the host's snapshots.
+  online.keyQueue.push({ k: key, lt: Math.max(0, (performance.now() - online.startedAt) / 1000) });
+  flushOnlineKeys(); // send at once: a key waiting for a timer is lag you can feel
 }
 
 function flushOnlineKeys() {
@@ -1319,6 +1693,7 @@ function flushOnlineKeys() {
 
 function handlePlayerTyping(evs) {
   duel.handleEvents(0, evs, duel.t);
+  if (online.active && online.role === "host") online.snapDirty = true; // the guest should see my hit now, not at the next tick
   // Typing sounds: a soft click per right key, a dull knock per typo (the word strikes sound from the fighters).
   if (evs.some((v) => v.type === "wrong")) Sfx.play("typo");
   else if (evs.some((v) => v.type === "correct" || v.type === "word")) Sfx.play("key");
@@ -1336,6 +1711,11 @@ window.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const top = topModal();
   if (top) { modalKey(top, e); return; }
+  if (BrawlGame.active && !screen) { // a Brawl fight: the buttons are read by BrawlInput; here only Esc and the browser's own keys
+    if (e.key === "Escape") { e.preventDefault(); act("pause"); }
+    else if (BrawlInput.isGameKey(e.code) || e.key === " ") e.preventDefault();
+    return;
+  }
   if (duel.phase === "over" && !shownResult) return; // K.O. is playing out: wait for the result screen
   if (screen === "result" && performance.now() - resultShownAt < CONFIG.theme.resultKeyDelay) return; // still typing: ignore
   if (screen) {
@@ -1360,7 +1740,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key.length === 1) {
     const s = duel.streams[0], w = s.current(), ch = e.key.toLowerCase();
-    if (rec && s.typed.length < w.text.length + 5) rec.press(duel.t, w.text[s.typed.length], ch);
+    if (rec && s.typed.length < w.text.length + 5 && !s.absorbs(ch)) rec.press(duel.t, w.text[s.typed.length], ch);
     const evs = applyInputToSide(0, ch);
     queueOnlineKey(ch);
     // "Space ends a word" off: an exactly typed word ends by itself, with no key counted for the missing Space.
@@ -1385,6 +1765,11 @@ function updateHud(dt) {
   duel.typists.forEach((t, i) => {
     const p = panels[i];
     p.hpnum.textContent = Math.ceil(t.hp);
+    // Healing readout: HP per second the typist is getting back right now (the floating number is net of damage, so it hid this).
+    const healRate = duel.phase === "fight" && t.hp > 0 && t.hp < D.maxHp
+      ? (D.basis !== "wpm" ? D.healPerWpm * duel.wpmNow[i] : duelTune("regenScale") * Math.min(duel.power[0], duel.power[1])) : 0;
+    const shown = healRate * duel.healFactor();
+    p.heal.textContent = shown >= 0.05 ? "+" + shown.toFixed(1) + "/S" : "";
     p.hp.style.width = (t.hp / D.maxHp) * 100 + "%";
     // The pale "ghost" bar holds lost HP for a moment, then drains, so damage reads clearly.
     if (t.hp >= p.ghostHp) { p.ghostHp = t.hp; p.ghostHold = 0.4; }
@@ -1394,7 +1779,7 @@ function updateHud(dt) {
     p.wpm.textContent = Math.round(duel.wpmNow[i]);
     p.power.textContent = Math.round(duel.power[i]); // includes the counter boost
     p.counter.classList.toggle("on", duel.phase === "fight" && t.countering(duel.t));
-    p.combo.textContent = "x" + t.comboLevel;
+    p.combo.textContent = "x" + (D.basis !== "wpm" ? Math.floor(t.streak) : t.comboLevel);
     if (t.comboLevel !== p.lastCombo) {
       const cls = t.comboLevel > p.lastCombo ? "pop" : "broke";
       if (duel.phase === "fight") Sfx.play(cls === "pop" ? "combo" : "broken", t.comboLevel);
@@ -1403,28 +1788,37 @@ function updateHud(dt) {
     p.lastCombo = t.comboLevel;
     const per = t.weapon.wordsPerCombo;
     const inBlock = t.comboLevel >= D.maxComboLevel ? per : t.streak % per;
-    p.pips.forEach((pip, k) => pip.classList.toggle("on", k < inBlock));
+    p.pips.forEach((pip, k) => { pip.classList.toggle("on", k < Math.floor(inBlock)); pip.classList.toggle("half", k === Math.floor(inBlock) && inBlock % 1 >= 0.5); });
     p.ult.style.width = t.charge + "%";
     const ready = t.ultReady();
     p.ult.classList.toggle("ready", ready);
     p.ultText.classList.toggle("ready", ready);
     p.ultText.textContent = ready ? "ULTIMATE READY"
-      : t.charge >= 100 ? "NEEDS COMBO x" + t.weapon.comboRequired
+      : t.charge >= 100 ? "NEEDS " + (t.weapon.comboRequired * t.weapon.wordsPerCombo) + " IN A ROW"
       : "ULT " + Math.floor(t.charge) + "%";
     p.stun.textContent = duel.t < t.stunUntil ? "STUNNED" : "";
   });
 
-  $("timer").textContent = clock(duel.t);
+  const left = duel.timeLeft();
+  $("timer").textContent = left !== null ? clock(Math.ceil(left)) : clock(duel.t);
+  let tag = "";
+  if (run) {
+    if (run.kind === "endless") tag = `Endless, ${run.wins[0]} - ${run.wins[1]}`;
+    else if (run.kind === "practice") tag = "Practice";
+    else if (run.rules.endless) tag = "Endless";
+    else if (run.rules.rounds > 1) tag = `Round ${run.round}/${run.rules.rounds}, ${run.wins[0]} - ${run.wins[1]}`;
+  }
+  if ($("round-tag").textContent !== tag) $("round-tag").textContent = tag;
 
   // Net pressure in HP per second, from your point of view, as a tug-of-war rope:
   // the knot slides toward whoever is winning, full stretch at tugRange wpm of difference.
-  const net = D.damageScale * (duel.power[0] - duel.power[1]);
-  const full = D.damageScale * D.tugRange;
+  const net = damageRate(duel.power[0], duel.power[1]) - damageRate(duel.power[1], duel.power[0]);
+  const full = CONFIG.duel.basis === "speed" ? CONFIG.duel.relDamage * CONFIG.duel.tugRel : duelTune("damageScale") * duelTune("tugRange");
   const pos = Math.max(-1, Math.min(1, net / full)); // -1: all the way to you, +1: all the way to the bot
   const lead = net > 0.05, trail = net < -0.05;
   $("tug").className = lead ? "lead" : trail ? "trail" : "";
   // You are on the left: when you lead, the knot comes toward you.
-  const knot = 50 - pos * 50;
+  const knot = 50 - pos * 50 * (duel.mirror ? -1 : 1);
   $("tug-knot").style.left = knot + "%";
   const fill = $("tug-fill");
   fill.style.left = Math.min(knot, 50) + "%";
@@ -1476,15 +1870,26 @@ let last = performance.now(), acc = 0;
 const frameStats = { n: 0, ms: 0 }; // average cost of draw + HUD per frame (for tests)
 const perf = { frames: 0, ms: 0, since: performance.now() }; // for the FPS counter (Graphics > Show FPS)
 let nextDraw = 0;                                              // frame rate limit: when the next frame may be drawn
+// Online timing runs on the real clock (performance.now), not on the duel clock: the guest's duel clock only
+// moves when a snapshot arrives, so anything timed by it would wait for the very message it is meant to send.
+function sendSnapshot(now) {
+  online.snapN++;
+  online.net.send(Protocol.state(online.snapN, duel.snapshot(online.snapN % 10 === 1), online.mid));
+  online.lastSnapAt = now;
+  online.snapDirty = false;
+}
 function onlineTick() {
   if (!online.active) return;
-  if (online.role === "guest" && online.keyQueue.length && duel.t >= online.keyFlushAt) {
-    flushOnlineKeys();
-    online.keyFlushAt = duel.t + CONFIG.net.keyBatchMs / 1000;
+  const now = performance.now();
+  if (online.role === "guest" && online.keyQueue.length) flushOnlineKeys();
+  if (online.role === "host" && online.net && duel.phase !== "menu") {
+    const every = 1000 / CONFIG.net.snapshotHz, quick = CONFIG.net.snapshotMinMs;
+    // Periodic snapshot, plus an early one right after the judge changed something (a key from either player).
+    if (now - online.lastSnapAt >= every || (online.snapDirty && now - online.lastSnapAt >= quick)) sendSnapshot(now);
   }
-  if (online.role === "host" && online.net && duel.phase !== "menu" && duel.t >= online.snapNext) {
-    online.net.send(Protocol.state(online.snapN++, duel.snapshot()));
-    online.snapNext = duel.t + 1 / CONFIG.net.snapshotHz;
+  if (online.net && now - online.pingAt >= 2000) {
+    online.pingAt = now;
+    online.net.send(Protocol.ping(++online.pingId, now));
   }
   if (online.role === "host" && duel.phase === "fight" && duel.t >= traceNext) {
     online.trace.push([duel.wpmNow[0], duel.wpmNow[1], duel.typists[0].hp, duel.typists[1].hp]);
@@ -1508,6 +1913,12 @@ function loop(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   const t0 = performance.now();
+  if (BrawlGame.active) { // the fighting mode draws and steps itself
+    BrawlGame.frame(dt);
+    onlineTick();
+    requestAnimationFrame(loop);
+    return;
+  }
   const frozen = paused();
   const remoteView = online.active && online.role === "guest";
   if (duel.phase !== "menu" && !frozen && !remoteView) {
@@ -1525,31 +1936,25 @@ function loop(now) {
     if (view) view.sync();
   } else {
     acc = 0;
-    if (remoteView && view) view.sync();
+    if (remoteView && view) { if (!frozen) duel.advanceRemote(dt); view.sync(); }
   }
   onlineTick();
-  if (duel.phase === "over" && !shownResult && duel.fighters.some((f) => f.dead && f.state === "down" && f.stateT > 0.6)) {
+  const koDone = duel.fighters.some((f) => f.dead && f.state === "down" && f.stateT > 0.6);
+  const timeDone = duel.result && duel.result.byTime && duel.overT > 1.4;
+  if (duel.phase === "over" && !shownResult && (koDone || timeDone) && !online.waitingResult) {
     shownResult = true;
     resultShownAt = performance.now();
-    if (rec) {
-      rec.sample(duel);
-      lastRecord = rec.finish(duel);
-      if (!Stats.add(lastRecord)) toast("This match could not be saved to your stats: the browser's storage is full or blocked.");
-      const mine = avgWpm(duel.typists[0]);
-      if (mine > 0 && duel.t > 5) saveHistory(mine); // for MATCH ME
-    }
-    if (isOnlineMatch()) online.screenState = "result";
-    showResult();
+    roundOver();
   }
   if (online.waitingResult && !shownResult && duel.phase === "over") {
     shownResult = true;
     resultShownAt = performance.now();
-    online.screenState = "result";
-    showResult();
+    roundOver();
   }
   if (duel.phase !== "over") shownResult = false;
   renderer.draw(duel, frozen ? 0 : dt);
   if (screen === "fighter") DuelChars.drawPreview($("fighter-preview"), ROSTER[pickIndex], frozen ? 0 : dt, settings.reduceMotion);
+  if (screen === "creator") DuelChars.drawPreview($("creator-preview"), Creator.slotKey(), frozen ? 0 : dt, settings.reduceMotion);
   updateHud(dt);
   const cost = performance.now() - t0;
   frameStats.n++; frameStats.ms += cost;

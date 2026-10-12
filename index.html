@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Type Boxing</title>
+  <title>CounterType</title>
   <meta name="description" content="A real time typing fighting game: type faster than your opponent to hit, guard and land your ultimate.">
-  <link rel="stylesheet" href="css/duel.css">
+  <link rel="stylesheet" href="css/duel.css?v=20261013c">
 </head>
 <body>
   <!-- The arena fills the whole window. Everything else floats over it in #ui, which main.js scales
@@ -34,19 +34,22 @@
       <div class="hptop left" id="hp1"></div>
       <div id="center">
         <div id="timer">0:00</div>
+        <div id="round-tag"></div>
         <div id="tug"><div id="tug-fill"></div><div id="tug-mid"></div><div id="tug-knot"></div></div>
         <div id="tug-row"><span id="tug-label">EDGE</span><span id="tug-val">0.0</span><span id="tug-unit">HP/S</span></div>
       </div>
       <div class="hptop right" id="hp2"></div>
       <div class="side left" id="p1"></div>
       <div class="side right" id="p2"></div>
-      <button id="pause-btn" class="icon-btn" data-act="pause" tabindex="-1" aria-label="Pause" title="Pause (Esc)">
+      <button id="pause-btn" class="icon-btn" data-act="pause" tabindex="-1" aria-label="Pause" title="Pause">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></svg>
-        <kbd>Esc</kbd>
       </button>
     </div>
 
     <div id="countdown"></div>
+    <!-- Brawl (the fighting mode): its own HUD; the typing HUD above is hidden while it runs. -->
+    <div id="bhud"></div>
+    <div id="round-banner" class="hidden" aria-live="polite"></div>
 
     <!-- Over-head view: a thin line for your progress through the current word. -->
     <div id="word-progress"><div id="word-progress-fill"></div></div>
@@ -61,7 +64,7 @@
     <div id="overlay">
       <section id="scr-title" class="screen">
         <div id="title-left">
-          <h1 class="logo" aria-label="Type Boxing"><span class="l1">TYPE</span><span class="l2">BOXING</span></h1>
+          <h1 class="logo" aria-label="CounterType"><span class="l1">COUNTER</span><span class="l2">TYPE</span></h1>
           <nav id="title-menu"></nav>
         </div>
         <div id="title-bots" class="panel"></div>
@@ -75,6 +78,7 @@
         <h2 class="screen-title">Online</h2>
         <div id="online-status"></div>
         <div id="online-room"></div>
+        <div id="online-rules"></div>
         <div class="online-join">
           <input id="room-code" type="text" maxlength="7" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Room code">
         </div>
@@ -94,6 +98,10 @@
           <div class="btn-row" id="fighter-btns"></div>
         </div>
       </section>
+
+      <section id="scr-creator" class="screen"></section>
+
+      <section id="scr-bresult" class="screen"></section>
 
       <section id="scr-result" class="screen">
         <div id="ko-card" class="panel">
@@ -121,25 +129,53 @@
     <div id="perf" class="hidden" aria-hidden="true"></div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/themes.js"></script>
+  <!-- Brawl touch buttons: outside #ui so they keep a real finger size at any UI scale. -->
+  <div id="touch" class="hidden" aria-label="Touch controls">
+    <div id="touch-pad">
+      <button data-bit="5" class="tb ul" tabindex="-1" aria-label="Jump back">&#9702;</button>
+      <button data-bit="4" class="tb up" tabindex="-1" aria-label="Jump">&#9650;</button>
+      <button data-bit="6" class="tb ur" tabindex="-1" aria-label="Jump forward">&#9702;</button>
+      <button data-bit="1" class="tb left" tabindex="-1" aria-label="Left">&#9664;</button>
+      <button data-bit="2" class="tb right" tabindex="-1" aria-label="Right">&#9654;</button>
+      <button data-bit="9" class="tb dl" tabindex="-1" aria-label="Crouch left">&#9702;</button>
+      <button data-bit="8" class="tb down" tabindex="-1" aria-label="Crouch">&#9660;</button>
+      <button data-bit="10" class="tb dr" tabindex="-1" aria-label="Crouch right">&#9702;</button>
+    </div>
+    <div id="touch-acts">
+      <button data-bit="1024" class="tb sm q" tabindex="-1" aria-label="Projectile"><b>PROJ</b></button>
+      <button data-bit="4096" class="tb sm r" tabindex="-1" aria-label="Rising move"><b>RISE</b></button>
+      <button data-bit="2048" class="tb sm su" tabindex="-1" aria-label="Super"><b>SUPER</b></button>
+      <button data-bit="64" class="tb act hp" tabindex="-1" aria-label="High punch"><b>PUNCH</b><i>high</i></button>
+      <button data-bit="512" class="tb act hk kick" tabindex="-1" aria-label="High kick"><b>KICK</b><i>high</i></button>
+      <button data-bit="16" class="tb act lp" tabindex="-1" aria-label="Low punch"><b>PUNCH</b><i>low</i></button>
+      <button data-bit="128" class="tb act lk kick" tabindex="-1" aria-label="Low kick"><b>KICK</b><i>low</i></button>
+    </div>
+  </div>
+
+  <script src="js/config.js?v=20261013c"></script>
+  <script src="js/themes.js?v=20261013c"></script>
   <script src="js/vendor/peerjs.min.js"></script>
-  <script src="js/protocol.js"></script>
-  <script src="js/words.js"></script>
-  <script src="js/duel-typing.js"></script>
-  <script src="js/fighter.js"></script>
-  <script src="js/anim-rig.js"></script>
-  <script src="js/anim-clips.js"></script>
-  <script src="js/anim-move.js"></script>
-  <script src="js/anim-chars.js"></script>
-  <script src="js/anim-combos.js"></script>
-  <script src="js/duel-chars.js"></script>
-  <script src="js/sfx.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/duel.js"></script>
-  <script src="js/net.js"></script>
-  <script src="js/stats.js"></script>
-  <script src="js/stats-page.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/protocol.js?v=20261013c"></script>
+  <script src="js/modes.js?v=20261013c"></script>
+  <script src="js/brawl.js?v=20261013c"></script>
+  <script src="js/words.js?v=20261013c"></script>
+  <script src="js/duel-typing.js?v=20261013c"></script>
+  <script src="js/fighter.js?v=20261013c"></script>
+  <script src="js/anim-rig.js?v=20261013c"></script>
+  <script src="js/anim-clips.js?v=20261013c"></script>
+  <script src="js/anim-move.js?v=20261013c"></script>
+  <script src="js/anim-chars.js?v=20261013c"></script>
+  <script src="js/anim-combos.js?v=20261013c"></script>
+  <script src="js/duel-chars.js?v=20261013c"></script>
+  <script src="js/sfx.js?v=20261013c"></script>
+  <script src="js/render.js?v=20261013c"></script>
+  <script src="js/duel.js?v=20261013c"></script>
+  <script src="js/net.js?v=20261013c"></script>
+  <script src="js/stats.js?v=20261013c"></script>
+  <script src="js/stats-page.js?v=20261013c"></script>
+  <script src="js/creator.js?v=20261013c"></script>
+  <script src="js/brawl-input.js?v=20261013c"></script>
+  <script src="js/brawl-game.js?v=20261013c"></script>
+  <script src="js/main.js?v=20261013c"></script>
 </body>
 </html>

@@ -430,28 +430,126 @@ const Rig = (() => {
     poly(ctx, S, h, deg, [[9, 0.6], [60, 0.8], [106, -2.4], [112, -3.4], [60, 2.6], [9, 3]], "#a7aeb9");
     seg(ctx, S, h, deg, 8, 14, 2.4, pal.glow || acc);
   };
-  // Crimson Veil's whip: a short gold-capped grip, a braided black lash that sags under its own weight, and
-  // an ornate gold leaf with a teal gem at the tip.
-  WEAPON_DRAW.whip = (ctx, S, h, deg, acc, pal) => {
-    seg(ctx, S, h, deg, -12, 12, 6.4, "#120d10");
-    bands(ctx, S, h, deg, -10, 10, 5, pal.gold, 6.8);
-    dot(ctx, S.wpt(h, deg, -14, 0), 4, pal.gold, "#5a4318", 1.2);
-    const a = S.wpt(h, deg, 12, 0), tip = S.wpt(h, deg, 138, 0), mid = S.wpt(h, deg, 78, 0);
-    const sag = 26 * Math.abs(Math.cos(deg * Math.PI / 180)) + 8;
-    const c = [mid[0], mid[1] + sag];
-    const at = (t) => [(1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * c[0] + t * t * tip[0], (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * c[1] + t * t * tip[1]];
-    for (const [w, col] of [[4.6, "#0a0709"], [2.8, "#3a2a2e"]]) {
-      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(c[0], c[1], tip[0], tip[1]); ctx.stroke();
-    }
-    ctx.strokeStyle = "#5a4a4e"; ctx.lineWidth = 1;
-    for (let t = 0.06; t < 0.96; t += 0.06) { const p = at(t), q = at(t + 0.02); ctx.beginPath(); ctx.moveTo(p[0] - 1.6, p[1] - 1.6); ctx.lineTo(q[0] + 1.6, q[1] + 1.6); ctx.stroke(); }
-    const pre = at(0.92), ang = Math.atan2(tip[1] - pre[1], tip[0] - pre[0]);
-    ctx.save(); ctx.translate(tip[0], tip[1]); ctx.rotate(ang);
-    ctx.beginPath(); ctx.moveTo(-2, 0); ctx.lineTo(6, -6); ctx.lineTo(20, 0); ctx.lineTo(6, 6); ctx.closePath();
-    ctx.fillStyle = pal.gold; ctx.fill(); ctx.strokeStyle = "#5a4318"; ctx.lineWidth = 1.1; ctx.stroke();
-    ctx.beginPath(); ctx.arc(7, 0, 2.4, 0, Math.PI * 2); ctx.fillStyle = pal.teal; ctx.fill();
+  // Crimson Veil's dagger lash: one long braided whip held by its middle, with a dagger tied to each end.
+  // The front hand pays out the front lash and the back hand the back one (angles p.w and p.w2); between the two
+  // hands the spare cord hangs in a loop. A cord sags under its own weight, so a lash that points down lets its
+  // dagger dangle and one thrown out level pulls nearly straight. which: "front" draws the front lash, the loop
+  // between the hands and the front dagger; "back" draws the back lash and dagger (behind the body).
+  const LASH = { reach: 96, blade: 46 };
+  function lashBlade(ctx, x, y, ang, pal) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    const fill = (pts, c, edge, w) => { ctx.beginPath(); pts.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath();
+      if (c) { ctx.fillStyle = c; ctx.fill(); } if (edge) { ctx.strokeStyle = edge; ctx.lineWidth = w || 1.2; ctx.stroke(); } };
+    ctx.beginPath(); ctx.arc(-3, 0, 3.4, 0, Math.PI * 2); ctx.strokeStyle = pal.gold; ctx.lineWidth = 1.8; ctx.stroke();      // the ring the cord is tied to
+    fill([[0, -2.6], [9, -2.6], [9, 2.6], [0, 2.6]], pal.redD || "#760b1b", "#120a0c", 1);                                // wrapped grip
+    fill([[9, -7], [12.5, -7], [12.5, 7], [9, 7]], pal.gold, "#5a4318", 1.1);                                              // crossguard
+    fill([[12.5, -3.4], [LASH.blade - 10, -3.8], [LASH.blade, 0], [LASH.blade - 10, 3.8], [12.5, 3.4]], "#d9dee6", "#3c4048", 1.3); // blade
+    fill([[14, 0.4], [LASH.blade - 10, 0.5], [LASH.blade - 2, 0], [LASH.blade - 10, 3.8], [14, 3.2]], "#a7aeb9");           // shaded half
+    ctx.beginPath(); ctx.arc(10.8, 0, 2, 0, Math.PI * 2); ctx.fillStyle = pal.teal; ctx.fill();                              // teal gem
     ctx.restore();
+  }
+  function lashCord(ctx, a, c, b, width) {
+    for (const [w, col] of [[width + 2, "#0a0709"], [width, "#3a2a2e"]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(c[0], c[1], b[0], b[1]); ctx.stroke();
+    }
+    ctx.strokeStyle = "#8a1c2c"; ctx.lineWidth = 0.9; ctx.setLineDash([2.5, 3.5]);              // the crimson thread wound round the braid
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(c[0], c[1], b[0], b[1]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // The lash is one real rope: a chain of points that hangs, swings and whips under gravity. Both hands hold it
+  // (each pins one point), a dagger is tied to each end, and the animation's lash angles (p.w and p.w2) pull the
+  // rope straight when a lash is thrown out level and let it fall slack when it points down or is cocked back.
+  const ROPE = { seg: 8, front: 12, spare: 9, back: 12, gravity: 1500, damp: 0.986, iter: 7, step: 1 / 120 };
+  function newRope() { return { pts: null, hands: [0, 0], n: ROPE.front + ROPE.spare + ROPE.back + 1, iF: ROPE.front, iB: ROPE.front + ROPE.spare }; }
+  function ropeReset(r, hF, hB) {
+    r.pts = [];
+    for (let i = 0; i < r.n; i++) {
+      const k = i <= r.iF ? r.iF - i : i >= r.iB ? i - r.iB : 0, h = i <= r.iB && i >= r.iF ? null : (i < r.iF ? hF : hB);
+      let x, y;
+      if (h) { x = h[0]; y = h[1] + k * ROPE.seg; }
+      else { const t = (i - r.iF) / (r.iB - r.iF); x = hF[0] + (hB[0] - hF[0]) * t; y = hF[1] + (hB[1] - hF[1]) * t + 14 * Math.sin(Math.PI * t); }
+      r.pts.push({ x, y, px: x, py: y });
+    }
+  }
+  const smooth01 = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  // How straight the animation wants a lash: 1 when it points level (out in front or behind), near 0 when it points down or up.
+  const lashPull = (deg) => 0.04 + 0.62 * smooth01(0.9, 0.4, Math.abs(Math.sin(deg * Math.PI / 180)));
+  function stepRope(r, S, dt) {
+    const hF = S.J.fh, hB = S.J.bh, p = S.p, wB = p.w2 !== undefined ? p.w2 : p.w;
+    if (!r.pts || r.pts.some((q) => Math.abs(q.x - hF[0]) > 320 || Math.abs(q.y - hF[1]) > 320)) ropeReset(r, hF, hB);
+    const n = Math.max(1, Math.min(8, Math.round(dt / ROPE.step))), h = dt / n, pts = r.pts;
+    const tF = lashPull(p.w), tB = lashPull(wB);
+    for (let s = 0; s < n; s++) {
+      for (let i = 0; i < r.n; i++) {
+        const q = pts[i], vx = (q.x - q.px) * ROPE.damp, vy = (q.y - q.py) * ROPE.damp;
+        q.px = q.x; q.py = q.y;
+        q.x += vx; q.y += vy + ROPE.gravity * h * h * (i < 2 || i > r.n - 3 ? 1.5 : 1);
+      }
+      // The animation's own lash angles straighten a lash that is thrown out.
+      for (let k = 1; k <= ROPE.front; k++) {
+        const q = pts[r.iF - k], t = S.wpt(S.L.fh, p.w, k * ROPE.seg, 0), w = tF * (0.3 + 0.7 * k / ROPE.front);
+        q.x += (t[0] - q.x) * w; q.y += (t[1] - q.y) * w;
+      }
+      for (let k = 1; k <= ROPE.back; k++) {
+        const q = pts[r.iB + k], t = S.wpt(S.L.bh, wB, k * ROPE.seg, 0), w = tB * (0.3 + 0.7 * k / ROPE.back);
+        q.x += (t[0] - q.x) * w; q.y += (t[1] - q.y) * w;
+      }
+      for (let it = 0; it < ROPE.iter; it++) {
+        pts[r.iF].x = hF[0]; pts[r.iF].y = hF[1]; pts[r.iB].x = hB[0]; pts[r.iB].y = hB[1];
+        for (let i = 0; i < r.n - 1; i++) {
+          const a = pts[i], b = pts[i + 1];
+          let dx = b.x - a.x, dy = b.y - a.y; const d = Math.hypot(dx, dy) || 1e-3, f = (d - ROPE.seg) / d;
+          const aPin = i === r.iF || i === r.iB, bPin = i + 1 === r.iF || i + 1 === r.iB;
+          if (aPin && bPin) continue;
+          if (aPin) { b.x -= dx * f; b.y -= dy * f; }
+          else if (bPin) { a.x += dx * f; a.y += dy * f; }
+          else { a.x += dx * f * 0.5; a.y += dy * f * 0.5; b.x -= dx * f * 0.5; b.y -= dy * f * 0.5; }
+        }
+      }
+      for (const q of pts) if (q.y > 4) { q.y = 4; q.py = q.y + (q.py - q.y) * 0.2; q.px = q.x - (q.x - q.px) * 0.5; } // the floor: the rope lies on it
+    }
+  }
+  function ropePath(ctx, pts, i0, i1) {
+    ctx.beginPath(); ctx.moveTo(pts[i0].x, pts[i0].y);
+    for (let i = i0 + 1; i < i1; i++) { const m = [(pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2]; ctx.quadraticCurveTo(pts[i].x, pts[i].y, m[0], m[1]); }
+    ctx.lineTo(pts[i1].x, pts[i1].y);
+  }
+  function ropeCord(ctx, pts, i0, i1) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (const [w, col] of [[4.6, "#0a0709"], [2.7, "#3a2a2e"]]) { ctx.strokeStyle = col; ctx.lineWidth = w; ropePath(ctx, pts, i0, i1); ctx.stroke(); }
+    ctx.strokeStyle = "#8a1c2c"; ctx.lineWidth = 0.9; ctx.setLineDash([2.5, 3.5]); ropePath(ctx, pts, i0, i1); ctx.stroke(); ctx.setLineDash([]);
+  }
+  function ropeBlade(ctx, pts, tip, prev, pal) {
+    const a = pts[tip], b = pts[prev];
+    lashBlade(ctx, a.x, a.y, Math.atan2(a.y - b.y, a.x - b.x), pal);
+  }
+  function lashDraw(ctx, S, pal, which) {
+    const r = S.rope, pts = r.pts;
+    if (which === "back") { ropeCord(ctx, pts, r.iB, r.n - 1); ropeBlade(ctx, pts, r.n - 1, r.n - 2, pal); return; }
+    ropeCord(ctx, pts, 0, r.iB);
+    ropeBlade(ctx, pts, 0, 1, pal);
+    for (const hd of [S.J.fh, S.J.bh]) dot(ctx, hd, 3.4, pal.gold, "#5a4318", 1.1);
+  }
+  // Without a live rope (afterimages, previews that do not step cloth) the lash is drawn as two sagging cords.
+  function lashArm(ctx, S, hand, deg, pal) {
+    const a = S.wpt(hand, deg, 2, 0), b = S.wpt(hand, deg, LASH.reach, 0), m = S.wpt(hand, deg, LASH.reach / 2, 0);
+    const sag = 30 * Math.abs(Math.cos(deg * Math.PI / 180)) + 6;
+    const c = [m[0], m[1] + sag * 1.6];
+    lashCord(ctx, a, c, b, 2.6);
+    const ang = Math.atan2(b[1] - c[1], b[0] - c[0]);
+    lashBlade(ctx, b[0], b[1], ang, pal);
+  }
+  WEAPON_DRAW.daggerLash = (ctx, S, h, deg, acc, pal, which) => {
+    pal = pal || { gold: "#c9a24a", teal: "#2fd0c0", redD: "#760b1b" };
+    if (S.rope && S.rope.pts) { lashDraw(ctx, S, pal, which); return; }
+    const p = S.p;
+    if (which !== "front") lashArm(ctx, S, S.L.bh, p.w2 !== undefined ? p.w2 : deg, pal);
+    if (which === "back") return;
+    const g1 = S.wpt(S.L.fh, deg, -2, 0), g2 = S.wpt(S.L.bh, p.w2 !== undefined ? p.w2 : deg, -2, 0);
+    const d = Math.hypot(g1[0] - g2[0], g1[1] - g2[1]), slack = Math.sqrt(Math.max(0, 64 * 64 - d * d));
+    lashCord(ctx, g1, [(g1[0] + g2[0]) / 2, (g1[1] + g2[1]) / 2 + slack * 1.1 + 4], g2, 2.6);
+    for (const [hd, an] of [[S.L.fh, deg], [S.L.bh, p.w2 !== undefined ? p.w2 : deg]]) dot(ctx, S.wpt(hd, an, 0, 0), 3.4, pal.gold, "#5a4318", 1.1);
+    lashArm(ctx, S, S.L.fh, deg, pal);
   };
   // Scarlet Reaver's axe: one huge grey crescent with blood streaks and a pale edge, a demon skull crowning
   // the head, red wraps on the shaft.
@@ -498,6 +596,7 @@ const Rig = (() => {
   const WEAPONS = {
     sword:  { draw: "sword",  hands: 1, trail: [[106, 0], [36, 0]] },
     dual:   { draw: "dagger", hands: 2, trail: [[60, 0], [16, 0]], dual: true },
+    lash:   { draw: "daggerLash", hands: 2, trail: [[142, 0], [96, 0]], dual: true }, // Crimson Veil: a whip with a dagger on each end
     spear:  { draw: "spear",  hands: 2, trail: [[140, 0], [92, 0]] },
     hammer: { draw: "hammer", hands: 2, trail: [[98, 0], [66, 0]], heavy: true },
     scythe: { draw: "scythe", hands: 2, trail: [[78, -102], [114, -30]] },
@@ -739,5 +838,5 @@ const Rig = (() => {
     }
   }
 
-  return { pt, ik, dot, ribbon, seg, poly, footPt, Chain, WEAPON_DRAW, openHand, SK, BODY, EASE, FIELDS, BASE, P, blend, sample, sampleEase, solve, makeCloth, stepCloth, resetCloth, drawFighter, drawTrail, trailPoints, WEAPONS, clamp, lerp, smooth };
+  return { pt, ik, dot, ribbon, seg, poly, footPt, Chain, WEAPON_DRAW, openHand, SK, BODY, EASE, FIELDS, BASE, P, blend, sample, sampleEase, solve, makeCloth, stepCloth, resetCloth, drawFighter, drawTrail, trailPoints, WEAPONS, clamp, lerp, smooth, newRope, stepRope };
 })();
