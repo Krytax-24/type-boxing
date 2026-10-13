@@ -449,8 +449,10 @@ console.log("Online snapshot");
   check("the guest sees the host's hp mirrored", guest.typists[1].hp === Math.round(host.typists[0].hp * 100) / 100 && guest.typists[0].hp === Math.round(host.typists[1].hp * 100) / 100);
   check("the guest sees the host's word stream on the far side", guest.streams[1].current().text === host.streams[0].current().text);
   const hp = guest.typists.map((x) => x.hp), t0 = guest.t;
+  guest.hitstop = 0.08;
   for (let i = 0; i < 30; i++) guest.advanceRemote(1 / 60);
   check("advanceRemote moves the clock but never the hp", guest.t > t0 + 0.4 && guest.typists.every((x, i) => x.hp === hp[i]));
+  check("advanceRemote releases visual hit-stop on the guest", guest.hitstop === 0);
   const fx0 = guest.fighters[0].x, tx = guest.fighters[0].tx;
   check("fighters ease toward the host's position", Math.abs(guest.fighters[0].x - tx) <= Math.abs(fx0 - tx) + 1e-9);
 }
