@@ -588,13 +588,55 @@ function clearRoomInput() {
   if (input) input.value = "";
 }
 
+// Copy and paste for room codes. The Clipboard API needs a secure page; the old copy command is the fallback.
+function copyText(text, done) {
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+    ta.remove();
+    toast(ok ? done : "Could not copy. Select the text and press Ctrl+C.");
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast(done), fallback);
+  else fallback();
+}
+
+// Accepts a bare code, a code with spaces or dashes, or a whole invite link (the code is its ?room= part).
+function roomFromText(text) {
+  text = String(text || "").trim();
+  const m = text.match(/[?&]room=([^&#\s]+)/i);
+  if (m) text = m[1];
+  return text.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function setRoomInput(text) {
+  const input = $("room-code");
+  if (!input || input.disabled) return false;
+  input.value = roomFromText(text).slice(0, input.maxLength > 0 ? input.maxLength : 7);
+  return !!input.value;
+}
+
+function pasteRoomCode() {
+  const input = $("room-code");
+  if (!input || input.disabled) return;
+  const manual = () => { input.focus(); toast("Click the box and press Ctrl+V to paste."); };
+  if (!navigator.clipboard || !navigator.clipboard.readText) { manual(); return; }
+  navigator.clipboard.readText().then((t) => {
+    if (setRoomInput(t)) toast("Code pasted. Press Join.");
+    else toast("The clipboard has no room code.");
+  }, manual);
+}
+
 function renderOnline() {
   showScreen("online");
   const on = onlineAvailable(), state = online.screenState;
   $("online-status").textContent = on ? (online.status || "Create a private room or join a friend's code.") :
     "Online play needs the page served over http or https, or a LAN server override.";
   let room = "Room codes exist only while the host keeps this page open.";
-  if (online.code) room = `<span>Room code</span><b>${online.code}</b><code>${inviteLink()}</code>`;
+  if (online.code) room = `<span>Room code</span><b class="selectable">${online.code}</b><code class="selectable">${inviteLink()}</code>` +
+    `<div class="copy-row"><button class="seg" data-act="online-copy" tabindex="-1">Copy code</button><button class="seg" data-act="online-copylink" tabindex="-1">Copy invite link</button></div>`;
   if (online.peerProfile) room += `<span>Opponent: ${online.peerProfile.name}</span>`;
   if (online.connected && state !== "playing" && state !== "result") {
     room += `<span>${online.localReady ? "You are ready" : "You are not ready"} / ${online.remoteReady ? "Opponent ready" : "Opponent not ready"}</span>`;
@@ -604,6 +646,7 @@ function renderOnline() {
   $("online-rules").innerHTML = state === "playing" || state === "result" ? "" :
     `<div class="card-label"><span>Match rules</span><span>${guest ? "the host chooses" : "you choose as host"}</span></div>` + rulesHtml(guest, true, true, true);
   $("room-code").disabled = !on || online.connected || state === "waiting" || state === "playing";
+  $("room-paste").disabled = $("room-code").disabled;
   const readyLabel = online.localReady ? "Unready" : "Ready";
   const readyBtn = online.connected && state !== "playing" && state !== "result" ? btn("online-ready", readyLabel, "Enter", online.localReady ? "" : "primary") : "";
   $("online-btns").innerHTML =
@@ -1526,6 +1569,9 @@ function act(name) {
     case "online": if (!top && screen === "title") openOnline(); break;
     case "online-create": createOnlineRoom(); break;
     case "online-join": joinOnlineRoom(); break;
+    case "online-copy": if (online.code) copyText(online.code, "Room code copied."); break;
+    case "online-copylink": if (online.code) copyText(inviteLink(), "Invite link copied."); break;
+    case "online-paste": pasteRoomCode(); break;
     case "online-ready": toggleOnlineReady(); break;
     case "online-leave": goMenu(); break;
     case "fighter": if (!top && (screen === "title" || screen === "result" || screen === "howto" || screen === "online")) openFighter(); break;
@@ -1700,12 +1746,21 @@ function handlePlayerTyping(evs) {
   view.update();
 }
 
+// Ctrl+V into the room box: pull the code out of whatever was copied (a code or a full invite link).
+$("room-code").addEventListener("paste", (e) => {
+  const t = e.clipboardData && e.clipboardData.getData("text");
+  if (t == null) return;
+  e.preventDefault();
+  setRoomInput(t);
+});
+
 window.addEventListener("keydown", (e) => {
   Sfx.unlock(); // browsers allow audio only after a key or a click
   // A text box (theme code, image address, custom CSS) keeps its own keys; Esc leaves it.
   const tg = e.target;
   if (tg && (tg.tagName === "TEXTAREA" || (tg.tagName === "INPUT" && tg.type !== "range"))) {
     if (e.key === "Escape") { e.preventDefault(); tg.blur(); }
+    else if (e.key === "Enter" && tg.id === "room-code") { e.preventDefault(); tg.blur(); joinOnlineRoom(); }
     return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
