@@ -143,7 +143,7 @@ class TypingStream {
 // Other bases: a flat damageScale per point of gap.
 function damageRate(pa, pb) {
   const D = CONFIG.duel, gap = Math.max(0, pa - pb);
-  if (D.basis === "speed") return (D.relDamage * gap) / Math.max(pa, pb, D.relFloor);
+  if (D.basis === "speed") return Math.min(D.maxDps, (D.relDamage * gap) / Math.max(pa, pb, D.relFloor));
   return duelTune("damageScale") * gap;
 }
 

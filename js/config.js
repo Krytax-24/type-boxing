@@ -202,12 +202,13 @@ const CONFIG = {
     // speed still fills the ultimate bar. "wpm" brings back the old rule (power = wpm x combo level bonus). The
     // numbers in `accuracy` replace the same-named numbers above while the basis is "accuracy" (see duelTune()).
     basis: "speed",   // "speed" (default): power = your wpm. "accuracy": power = key accuracy. "wpm": the oldest rule (combo levels)
-    relDamage: 30, relFloor: 30, tugRel: 0.3, // speed basis: damage per second = relDamage x (speed gap / the faster speed, at least relFloor); the edge rope is full at a tugRel (30%) gap
-    healPerWpm: 0.03, // HP per second healed for each wpm you type (speed and accuracy bases)
+    relDamage: 20, relFloor: 30, tugRel: 0.3, // speed basis: damage per second = relDamage x (speed gap / the faster speed, at least relFloor), never more than maxDps; the edge rope is full at a tugRel (30%) gap
+    maxDps: 8,        // hard cap on damage per second from the speed gap. Without it a typist facing an idle opponent dealt the full relDamage x 100% (30 HP in the first second)
+    healPerWpm: 0.02, // HP per second healed for each wpm you type (speed and accuracy bases)
     comboStep: 0.0025,
     comboCap: 200,
     mistakeFactor: 0.5,     // a mistake multiplies the combo by this (0.5 halves it); once per word
-    healFadeStart: 35, healFadeEnd: 75, // healing fades out between these duel seconds, so a stalemate always ends
+    healFadeStart: 50, healFadeEnd: 110, // healing fades out between these duel seconds, so a stalemate always ends
     accuracy: { keys: 40, prior: 4, idleAfter: 3, damageScale: 1.2, tugRange: 12, clashBand: 1.5, counterBonus: 0.04 },
     countdown: 3,
     ultimate: {
