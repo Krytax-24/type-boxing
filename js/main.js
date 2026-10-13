@@ -1071,7 +1071,7 @@ function openStats(id) {
   if (screen === "title" || screen === "result") back = screen;
   showScreen("stats");
   StatsPage.open($("scr-stats"), id);
-  keyline([keyBtn("back", "Esc", "back")]);
+  keyline([]);   // the panel has its own Back button
 }
 function closeStats() {
   StatsPage.close();
@@ -1241,7 +1241,7 @@ const SETTINGS_TABS = [
   { name: "Typing", rows: [
     { id: "wordSubmit", label: "Your word submit", hint: "On: press Space or Enter after each word. Off: a word ends by itself when it is exactly right.",
       opts: ON_OFF, get: () => settings.wordSubmit, set: (v) => { settings.wordSubmit = v; } },
-    { type: "note", html: "A wrong letter skips the word in both modes. Off saves a key per word. Speed is counted the same either way, but the two are different races, so your stats keep them apart. In a match set to Mix, this is the setting you play with." },
+    { type: "note", html: "On the ultimate word a wrong letter skips it; every other word you can fix with Backspace. Off saves a key per word. Speed is counted the same either way, but the two are different races, so your stats keep them apart. In a match set to Mix, this is the setting you play with." },
   ] },
   { name: "Graphics", rows: [
     { type: "head", label: "Speed" },
@@ -1813,7 +1813,7 @@ function updateHud(dt) {
   // Net pressure in HP per second, from your point of view, as a tug-of-war rope:
   // the knot slides toward whoever is winning, full stretch at tugRange wpm of difference.
   const net = damageRate(duel.power[0], duel.power[1]) - damageRate(duel.power[1], duel.power[0]);
-  const full = CONFIG.duel.basis === "speed" ? CONFIG.duel.relDamage * CONFIG.duel.tugRel : duelTune("damageScale") * duelTune("tugRange");
+  const full = CONFIG.duel.basis === "speed" ? Math.min(CONFIG.duel.maxDps, CONFIG.duel.relDamage * CONFIG.duel.tugRel) : duelTune("damageScale") * duelTune("tugRange");
   const pos = Math.max(-1, Math.min(1, net / full)); // -1: all the way to you, +1: all the way to the bot
   const lead = net > 0.05, trail = net < -0.05;
   $("tug").className = lead ? "lead" : trail ? "trail" : "";
