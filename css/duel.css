@@ -337,8 +337,14 @@ kbd {
 }
 #online-room b { display: block; font-size: var(--t32); letter-spacing: 8px; color: var(--phosphor); }
 #online-room code { color: var(--text); overflow-wrap: anywhere; }
+/* The room code and invite link can be selected with the mouse and copied; the rest of the game stays unselectable. */
+.selectable { user-select: text; -webkit-user-select: text; cursor: text; }
+.selectable::selection { background: var(--magenta); color: var(--bg); }
+.copy-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.online-join { display: flex; gap: 8px; align-items: stretch; }
+.online-join .seg { height: 48px; min-width: 88px; }
 .online-join input {
-  width: 100%; height: 48px; padding: 0 16px; color: var(--text); background: var(--surface);
+  flex: 1; min-width: 0; user-select: text; -webkit-user-select: text; height: 48px; padding: 0 16px; color: var(--text); background: var(--surface);
   border: var(--border); border-radius: var(--r); font: 700 var(--t24) var(--font);
   letter-spacing: 6px; text-transform: uppercase; outline: none;
 }
