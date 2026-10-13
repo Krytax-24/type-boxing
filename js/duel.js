@@ -531,6 +531,8 @@ class Duel {
     this.flash = Math.max(0, this.flash - dt * 2.2);
     this.shake *= Math.pow(0.0008, dt);
     if (this.shake < 0.2) this.shake = 0;
+    if (!this.hitstopOn) this.hitstop = 0;
+    else this.hitstop = Math.max(0, this.hitstop - dt);
     for (const fx of this.fx) fx.age += dt;
     this.fx = this.fx.filter((fx) => fx.age < fx.life);
     for (const f of this.fighters) {
