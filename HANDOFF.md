@@ -128,3 +128,9 @@ Short: files changed, the weapon pair table and the bot calibration table with f
 6. Modes: Training, then Story Ladder; later Survival, Daily Seed, Word Packs.
 7. Online duel with PeerJS (shared seed and weapon ids, events both ways).
 8. Delete js/game.js. Equal-skill fights last 40 to 60 s (consider before online play).
+
+## October 2026 session: themes, settings, stats
+
+Done: Themes and custom CSS (js/themes.js), Graphics and Typing settings (frame cap, FPS counter, effect switches, scenery level, "Space ends a word" off), screen shake intensity with a test button, the My stats page and richer result screen (js/stats.js, js/stats-page.js), a rewritten How to play and plainer menu titles. See "Themes, settings and stats" in CLAUDE.md. Name ideas are in docs/NAME-IDEAS.md (the game is not renamed).
+
+Checked in a browser with Playwright: no console errors, all settings tabs, all presets, both typing modes, stats with 70 seeded matches, `node tests/duel-sim.js 0 0 0` passes. Not done: a hands-on test on a real phone or slow laptop, and the "applies from the next fight" hint on the Typing row.

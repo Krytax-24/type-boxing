@@ -145,7 +145,7 @@
   function ring(x, y, w, life) { particles.push({ k: "ring", x, y, w, life: life || 0.45, age: 0 }); }
   const HIT_SOUND = { fists: "punch", flame: "punch", dance: "punch", sword: "slash", bat: "bat", staff: "staff", axe: "axe" };
   // The drawn weapon picks the sound when it differs from the move set (a whip on sword moves, pistols on fists).
-  const DRAW_SOUND = { whip: "whip", katana: "slash", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
+  const DRAW_SOUND = { daggerLash: "whip", katana: "slash", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
   const hitSound = (a) => (a.def && DRAW_SOUND[a.def.weaponDraw]) || HIT_SOUND[a.weapon] || "punch";
   const drawOf = (a) => (a.def ? a.def.weaponDraw : null);
   function muzzle(a, S) { const h = S.J.fh; particles.push({ k: "flash", x: h[0] + a.facing * 26, y: h[1] - 4, r: 18, life: 0.07, age: 0, color: "255, 214, 90" }); sparks(h[0] + a.facing * 26, h[1] - 4, 5, "255, 214, 90", 0.6); }

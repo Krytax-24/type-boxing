@@ -16,9 +16,13 @@ const DuelChars = (() => {
   const snd = (stage, name, k) => { if (stage.audible && typeof Sfx !== "undefined") Sfx.play(name, k); };
 
   // The sound of a hit comes from the drawn weapon (a whip on sword moves, pistols on bare-hand moves).
-  const DRAW_SOUND = { cyberSword: "slash", katana: "slash", whip: "whip", bat: "bat", staff: "staff", axe: "axe", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
+  const DRAW_SOUND = { cyberSword: "slash", katana: "slash", daggerLash: "whip", bat: "bat", staff: "staff", axe: "axe", reaverAxe: "axe", warHammer: "hammer", pistols: "gun" };
   const hitSound = (def) => DRAW_SOUND[def.weaponDraw] || "punch";
   const defOf = (key) => Chars.DEFS[key] || Chars.DEFS[Chars.ORDER[0]];
+
+  // Effect switches from the Graphics tab (visual only; set by main.js with setFx). Every one defaults to on.
+  const FXO = { sparks: true, smears: true, afterimages: true, dust: true, glow: true, budget: 400 };
+  function setFx(o) { Object.assign(FXO, o); }
 
   // ---------- One fighter ----------
   class Puppet {
@@ -79,7 +83,9 @@ const DuelChars = (() => {
       this.freeze = 0;     // a short hit-stop on the puppets only
       this.shake = 0;
       this.audible = !!opt.audible;
-      this.judge = null;   // (attacker) -> "hit" | "block" | null; null: no reaction
+      this.judge = null;   // (attacker) -> "hit" | "block" | "clash" | null; null: no reaction
+      this.strength = null; // (attacker) -> 0..1, how far apart the powers are (scales sparks, shake, freeze)
+      this.onHit = null;   // (attacker, verdict, strength): tells the rules side that a strike landed (visual only)
     }
 
     setPuppets(specs) {
@@ -96,6 +102,7 @@ const DuelChars = (() => {
 
     // ----- effects -----
     sparks(x, y, n, color, size) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) {
         const a = rnd(0, Math.PI * 2);
         this.parts.push({ k: "spark", x, y, a, sp: rnd(160, 520) * (size || 1), len: rnd(8, 20) * (size || 1), life: rnd(0.16, 0.3), age: 0, color });
@@ -103,19 +110,22 @@ const DuelChars = (() => {
       this.parts.push({ k: "flash", x, y, r: 22 * (size || 1), life: 0.1, age: 0 });
     }
     dust(x, n, spread, dir, size) {
+      if (!FXO.dust) return;
       for (let i = 0; i < n; i++) this.parts.push({ k: "dust", x: x + rnd(-spread, spread) * 0.3, y: -rnd(0, 6), vx: dir * rnd(20, 90) + rnd(-spread, spread), vy: -rnd(10, 50), r: rnd(3, 7) * (size || 1), vr: rnd(10, 26), life: rnd(0.35, 0.6), age: 0 });
     }
-    ring(x, w, life) { this.parts.push({ k: "ring", x, y: 0, w, life: life || 0.45, age: 0 }); }
+    ring(x, w, life) { if (FXO.dust) this.parts.push({ k: "ring", x, y: 0, w, life: life || 0.45, age: 0 }); }
     fire(x, y, n, dir, size) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) this.parts.push({ k: "fire", x: x + rnd(-6, 6), y: y + rnd(-6, 6), vx: dir * rnd(80, 260) + rnd(-40, 40), vy: -rnd(30, 140), r: rnd(5, 11) * (size || 1), life: rnd(0.25, 0.5), age: 0 });
     }
     ice(x, y, n) {
+      if (!FXO.sparks) return;
       for (let i = 0; i < n; i++) { const a = rnd(Math.PI * 1.05, Math.PI * 1.95); this.parts.push({ k: "ice", x, y, vx: Math.cos(a) * rnd(60, 260), vy: Math.sin(a) * rnd(60, 260), r: rnd(2, 5), rot: rnd(0, 6), life: rnd(0.4, 0.8), age: 0 }); }
     }
-    star(x, y) { this.parts.push({ k: "star", x, y, life: 0.3, age: 0 }); this.sparks(x, y, 8, "255, 245, 210", 0.7); }
+    star(x, y) { if (!FXO.sparks) return; this.parts.push({ k: "star", x, y, life: 0.3, age: 0 }); this.sparks(x, y, 8, "255, 245, 210", 0.7); }
     muzzle(p) {
       const h = p.S.J.fh, x = h[0] + p.ch.facing * 26, y = h[1] - 4;
-      this.parts.push({ k: "flash", x, y, r: 16, life: 0.07, age: 0 });
+      if (FXO.sparks) this.parts.push({ k: "flash", x, y, r: 16, life: 0.07, age: 0 });
       this.sparks(x, y, 4, "255, 214, 90", 0.5);
     }
 
@@ -168,8 +178,20 @@ const DuelChars = (() => {
       const reach = (Anim.W[p.ch.weapon] || {}).reach || 120;
       const verdict = o && !o.ch.dead && Math.abs(o.ch.x - p.ch.x) < reach + 140 && this.judge ? this.judge(p) : null;
       if (!verdict) { this.sparks(q[0], q[1], 3, p.trail, 0.5); snd(this, "whoosh", 0); return; }
+      const k = this.strength ? this.strength(p) : 0.5;
+      if (this.onHit) this.onHit(p, verdict, k);
       const ox = o.ch.x, px = c && c.orb ? (p.ch.facing > 0 ? Math.min(q[0], ox) : Math.max(q[0], ox)) : q[0];
       const hx = lerp(px, ox, 0.4), hy = Math.min(q[1], -50);
+      if (verdict === "clash") {
+        // Equal power: the two weapons meet in the middle. Nobody wins the exchange, nobody is staggered.
+        const mx = (px + ox) / 2;
+        this.star(mx, hy);
+        this.sparks(mx, hy, 6, p.trail, 0.8);
+        this.freeze = Math.max(this.freeze, 0.04);
+        this.shake = Math.max(this.shake, 1.5);
+        snd(this, "parry");
+        return;
+      }
       if (verdict === "block") {
         // The defender's power holds: a parry, unless it is in the middle of its own attack (then a clash).
         if (!o.ult && canAct(o.ch) && !(o.ch.action && o.ch.action.c.react)) startClip(o, "parry", 1.4);
@@ -189,8 +211,8 @@ const DuelChars = (() => {
       if (p.ch.weapon === "flame") { this.fire(hx, hy, 12 + 6 * big, p.ch.facing); p.heat = 1; }
       if (draw === "axe") this.ice(hx, hy, 8 + 6 * big);
       if (draw === "warHammer") { this.ring(hx, 70 + 30 * big, 0.45); this.dust(hx, 5 + 4 * big, 60, 0); }
-      this.freeze = Math.max(this.freeze, 0.04 + 0.03 * big);
-      this.shake = Math.max(this.shake, 2 + 2.5 * big);
+      this.freeze = Math.max(this.freeze, 0.03 + 0.03 * big + 0.03 * k);
+      this.shake = Math.max(this.shake, 1.5 + 2.5 * big + 2 * k);
       snd(this, hitSound(p.def), big / 2);
       if (draw !== "pistols") snd(this, "hurt");
     }
@@ -201,6 +223,7 @@ const DuelChars = (() => {
       for (const [i, p] of this.p.entries()) {
         const ch = p.ch, prevClip = ch.action ? ch.action.c : null, prevU = ch.action ? ch.action.u : 0, prevX = ch.x;
         ch.update(dt, inputs ? inputs[i] : {}, (c, name) => this.event(c.pup, name));
+        if (this.after) this.after(p, i, ch);   // Brawl: the rules decide where a fighter is
         if (p.ult && !ch.action) p.ult = false;
         if (!ch.action) p.fin = false;
         p.flash = Math.max(0, p.flash - dt);
@@ -210,14 +233,14 @@ const DuelChars = (() => {
         const vel = (ch.x - prevX) / dt;
         if (!p.clothReady) { Chars.resetCloth(p.cloth, S); p.clothReady = true; for (let k = 0; k < 60; k++) Chars.stepCloth(p.cloth, S, 1 / 120, 0, k / 120, 0); }
         Chars.stepCloth(p.cloth, S, dt, 0, this.time, vel);
-        if (p.def.weaponDraw === "axe" && Math.random() < 0.2) { const q = Rig.trailPoints(S, "axe")[0][0]; this.parts.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.2), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
+        if (FXO.sparks && p.def.weaponDraw === "axe" && Math.random() < 0.2) { const q = Rig.trailPoints(S, "axe")[0][0]; this.parts.push({ k: "ice", x: q[0] + rnd(-8, 8), y: q[1] + rnd(-8, 8), vx: rnd(-20, 20), vy: rnd(-30, 10), r: rnd(1, 2.2), rot: 0, life: rnd(0.3, 0.6), age: 0 }); }
         this.trailStep(p, dt, prevClip, prevU);
         // Afterimages during the ultimate and a dash.
         for (const g of p.ghosts) g.life -= dt * 4.2;
         p.ghosts = p.ghosts.filter((g) => g.life > 0);
         p.ghostT -= dt;
         const gw = ch.action && ch.action.c.ghosts;
-        if ((p.ult && ch.action) || (gw && ch.action.u >= gw[0] && ch.action.u <= gw[1])) {
+        if (FXO.afterimages && ((p.ult && ch.action) || (gw && ch.action.u >= gw[0] && ch.action.u <= gw[1]))) {
           if (p.ghostT <= 0) { p.ghostT = 0.035; p.ghosts.push({ S, life: 1 }); }
         }
       }
@@ -264,7 +287,7 @@ const DuelChars = (() => {
         if (q.k === "ice") { q.x += q.vx * edt; q.y += q.vy * edt; q.vy += 600 * edt; q.rot += 8 * edt; if (q.y > 0) { q.y = 0; q.vy *= -0.3; q.vx *= 0.6; } }
       }
       this.parts = this.parts.filter((q) => q.age < q.life);
-      if (this.parts.length > 400) this.parts.splice(0, this.parts.length - 400);
+      if (this.parts.length > FXO.budget) this.parts.splice(0, this.parts.length - FXO.budget);
       this.shake = Math.max(0, this.shake - dt * 24);
     }
 
@@ -273,7 +296,8 @@ const DuelChars = (() => {
       opt = opt || {};
       const shadow = opt.shadow || "rgba(0, 0, 0, 0.45)";
       ctx.save();
-      if (this.shake && !opt.noShake) ctx.translate(rnd(-1, 1) * this.shake, rnd(-1, 1) * this.shake * 0.6);
+      const sk = this.shake * (opt.shakeScale === undefined ? 1 : opt.shakeScale); // the player's shake intensity
+      if (sk && !opt.noShake) ctx.translate(rnd(-1, 1) * sk, rnd(-1, 1) * sk * 0.6);
       // The attacker is drawn last, so its strike reads in front.
       const order = this.p.slice().sort((a, b) => (a.ch.action && !a.ch.action.c.react ? 1 : 0) - (b.ch.action && !b.ch.action.c.react ? 1 : 0));
       for (const p of order) {
@@ -287,8 +311,8 @@ const DuelChars = (() => {
         ctx.globalAlpha = 1;
         ctx.save();
         ctx.translate(0, -z);
-        for (const g of p.ghosts) Chars.draw(ctx, g.S, p.def, [], { ghost: `rgba(${p.ult ? "255, 197, 61" : p.trail}, 1)`, alpha: g.life * 0.22 });
-        if (p.glow && !opt.noGlow) {
+        if (FXO.afterimages) for (const g of p.ghosts) Chars.draw(ctx, g.S, p.def, [], { ghost: `rgba(${p.ult ? "255, 197, 61" : p.trail}, 1)`, alpha: g.life * 0.22 });
+        if (p.glow && !opt.noGlow && FXO.glow) {
           // Identity glow: a soft halo in the typist's color, so both read on the dark arena.
           ctx.save();
           ctx.shadowColor = `rgba(${p.glow}, 0.6)`;
@@ -299,7 +323,7 @@ const DuelChars = (() => {
         Chars.draw(ctx, S, p.def, p.cloth, { t: this.time, heat: p.heat, flash: p.flash > 0 });
         ctx.save();
         ctx.globalCompositeOperation = "lighter";
-        for (const h2 of p.trails) Rig.drawTrail(ctx, h2, `rgba(${p.trail}, 1)`);
+        if (FXO.smears) for (const h2 of p.trails) Rig.drawTrail(ctx, h2, `rgba(${p.trail}, 1)`);
         ctx.restore();
         ctx.restore();
       }
@@ -360,8 +384,12 @@ const DuelChars = (() => {
       if (p.ult) return "hit";
       const i = p.side;
       if (duel.fighters[1 - i].dead) return "hit";
-      return duel.power[i] - duel.power[1 - i] > 0.5 ? "hit" : "block";
+      const net = duel.power[i] - duel.power[1 - i], band = duelTune("clashBand");
+      return net > band ? "hit" : net < -band ? "block" : "clash";
     };
+    duelStage.strength = (p) => Math.min(1, Math.abs(duel.power[p.side] - duel.power[1 - p.side]) / duelTune("tugRange"));
+    duelStage.onHit = (p, verdict, k) => duel.hitLanded(p.side, verdict, k);
+    duel.puppetHits = true;
   }
 
   function driveDuel(duel, now) {
@@ -377,7 +405,7 @@ const DuelChars = (() => {
           if (ch.action && !ch.dead) ch.action = null;
           ch.playSeq(Combo2D.ultimate(p.def.weapon, p.seed + p.mc), null, 1.3);
           p.ult = true;
-          duelStage.parts.push({ k: "flash", x: ch.x, y: -90, r: 70, life: 0.25, age: 0 });
+          if (FXO.sparks) duelStage.parts.push({ k: "flash", x: ch.x, y: -90, r: 70, life: 0.25, age: 0 });
         } else if (f.move) {
           let kind = null;
           if (t.comboLevel > p.lastCombo) { kind = "finisher"; p.lastCombo = t.comboLevel; }
@@ -460,6 +488,7 @@ const DuelChars = (() => {
   // ---------- The Fighter screen: one fighter shows off its random combos ----------
   const previewStage = new Stage({ audible: false });
   let previewKey = "", previewT = 0, previewN = 0;
+  const resetPreview = () => { previewKey = null; };
   function drawPreview(canvas, key, dt, reduceMotion) {
     if (previewKey !== key) {
       previewKey = key; previewT = 0.9; previewN = 0;
@@ -496,5 +525,5 @@ const DuelChars = (() => {
     return k;
   }
 
-  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, botKey, defOf, duelStage, sparStage, previewStage };
+  return { Stage, Puppet, drawDuel, drawSpar, drawPreview, resetPreview, botKey, defOf, duelStage, sparStage, previewStage, setFx, FXO };
 })();
