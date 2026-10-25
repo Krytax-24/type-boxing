@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CounterType</title>
   <meta name="description" content="A real time typing fighting game: type faster than your opponent to hit, guard and land your ultimate.">
-  <link rel="stylesheet" href="css/duel.css?v=20261013e">
+  <link rel="stylesheet" href="css/countertype.dc574788e3.css">
 </head>
 <body>
-  <!-- The arena fills the whole window. Everything else floats over it in #ui, which main.js scales
-       from a 1366 x 768 design size to the window (fitUi). -->
   <canvas id="arena"></canvas>
 
   <div id="ui" class="idle">
-    <!-- Top bar on the menus: your fighter on the left, settings and fullscreen on the right. -->
     <header id="topbar">
       <button class="fighter-chip" data-act="fighter" tabindex="-1" aria-label="Your fighter">
         <span class="chip-swatch"></span><span class="chip-name">YOU</span><span class="chip-color"></span><span class="chip-weapon"></span>
@@ -28,8 +25,6 @@
       </div>
     </header>
 
-    <!-- In-fight HUD, versus style: your HP bar top-left, the clock and the edge rope top-center, the bot's HP bar
-         top-right (mirrored). WPM, power, combo and ultimate sit in each player's bottom corner. -->
     <div id="hud">
       <div class="hptop left" id="hp1"></div>
       <div id="center">
@@ -47,20 +42,15 @@
     </div>
 
     <div id="countdown"></div>
-    <!-- Brawl (the fighting mode): its own HUD; the typing HUD above is hidden while it runs. -->
-    <div id="bhud"></div>
     <div id="round-banner" class="hidden" aria-live="polite"></div>
 
-    <!-- Over-head view: a thin line for your progress through the current word. -->
     <div id="word-progress"><div id="word-progress-fill"></div></div>
-    <!-- Classic view: the Monkeytype style typing box. -->
     <div id="typing-box" class="panel">
       <div id="words">
         <div id="words-inner"><div id="caret"></div></div>
       </div>
     </div>
 
-    <!-- Menus. main.js shows one screen at a time and fills it from CONFIG. -->
     <div id="overlay">
       <section id="scr-title" class="screen">
         <div id="title-left">
@@ -104,6 +94,11 @@
 
       <section id="scr-bresult" class="screen"></section>
 
+      <section id="scr-mresult" class="screen"></section>
+      <section id="scr-queue" class="screen panel"></section>
+      <section id="scr-profile" class="screen panel"></section>
+      <section id="scr-leaders" class="screen panel"></section>
+
       <section id="scr-result" class="screen">
         <div id="ko-card" class="panel">
           <div id="ko-title"></div>
@@ -119,7 +114,6 @@
       <div id="keyline"></div>
     </div>
 
-    <!-- Modals: pause, settings and the quit confirm, stacked over the screen or the fight. -->
     <div id="modal" class="hidden">
       <section id="mod-pause" class="modal panel"></section>
       <section id="mod-settings" class="modal panel"></section>
@@ -130,7 +124,6 @@
     <div id="perf" class="hidden" aria-hidden="true"></div>
   </div>
 
-  <!-- Brawl touch buttons: outside #ui so they keep a real finger size at any UI scale. -->
   <div id="touch" class="hidden" aria-label="Touch controls">
     <div id="touch-pad">
       <button data-bit="5" class="tb ul" tabindex="-1" aria-label="Jump back">&#9702;</button>
@@ -153,30 +146,7 @@
     </div>
   </div>
 
-  <script src="js/config.js?v=20261013e"></script>
-  <script src="js/themes.js?v=20261013e"></script>
   <script src="js/vendor/peerjs.min.js"></script>
-  <script src="js/protocol.js?v=20261013e"></script>
-  <script src="js/modes.js?v=20261013e"></script>
-  <script src="js/brawl.js?v=20261013e"></script>
-  <script src="js/words.js?v=20261013e"></script>
-  <script src="js/duel-typing.js?v=20261013e"></script>
-  <script src="js/fighter.js?v=20261013e"></script>
-  <script src="js/anim-rig.js?v=20261013e"></script>
-  <script src="js/anim-clips.js?v=20261013e"></script>
-  <script src="js/anim-move.js?v=20261013e"></script>
-  <script src="js/anim-chars.js?v=20261013e"></script>
-  <script src="js/anim-combos.js?v=20261013e"></script>
-  <script src="js/duel-chars.js?v=20261013e"></script>
-  <script src="js/sfx.js?v=20261013e"></script>
-  <script src="js/render.js?v=20261013e"></script>
-  <script src="js/duel.js?v=20261013e"></script>
-  <script src="js/net.js?v=20261013e"></script>
-  <script src="js/stats.js?v=20261013e"></script>
-  <script src="js/stats-page.js?v=20261013e"></script>
-  <script src="js/creator.js?v=20261013e"></script>
-  <script src="js/brawl-input.js?v=20261013e"></script>
-  <script src="js/brawl-game.js?v=20261013e"></script>
-  <script src="js/main.js?v=20261013e"></script>
+  <script src="js/countertype.9731028590.js"></script>
 </body>
 </html>
