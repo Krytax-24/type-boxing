@@ -1,0 +1,188 @@
+/* Home page (#scr-title): the logo over a column of big buttons on the left, a panel on the right, the sparring
+   loop in the middle. A mode's title view uses the same two columns; the cards below are shared by those views. */
+
+/* Keep the middle of the arena clear for the sparring loop; darken only the two sides. */
+#overlay[data-screen="title"] {
+  justify-content: space-between;
+  background: linear-gradient(
+    90deg,
+    rgba(var(--bg-rgb), 0.8) 0,
+    rgba(var(--bg-rgb), 0.1) 32%,
+    rgba(var(--bg-rgb), 0.1) 66%,
+    rgba(var(--bg-rgb), 0.8) 100%
+  );
+}
+#scr-title {
+  width: 100%;
+  flex: 1;
+  grid-template-columns: 352px 1fr 432px;
+  align-items: center;
+  gap: 24px;
+  min-height: 0;
+}
+#title-left {
+  grid-column: 1;
+  display: grid;
+  gap: 24px;
+  align-content: center;
+}
+.logo {
+  margin: 0;
+  font-size: var(--t64);
+  line-height: 64px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  text-shadow: var(--outline);
+}
+.logo span {
+  display: block;
+}
+.logo .l1 {
+  color: var(--text);
+  text-shadow:
+    4px 0 0 var(--magenta),
+    var(--outline);
+}
+.logo .l2 {
+  color: var(--phosphor);
+  text-shadow:
+    4px 0 0 rgba(var(--magenta-rgb), 0.55),
+    var(--outline);
+}
+#title-menu {
+  display: grid;
+  gap: 8px;
+}
+#title-bots {
+  grid-column: 3;
+  padding: 16px;
+  display: grid;
+  gap: 6px;
+  align-self: center;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+}
+#title-bots.hidden {
+  display: none;
+}
+
+/* Home: the mode buttons, then a row of small links. Your rank per mode on the right. */
+.mini-row,
+.mode-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mini-row .btn {
+  padding: 0 8px;
+}
+.mode-row .mbtn {
+  justify-content: center;
+  padding: 0 8px;
+  letter-spacing: 2px;
+}
+.mode-row .mbtn:hover {
+  transform: translateY(-1px);
+}
+.rank-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  padding: 0 12px;
+  font-size: var(--t16);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.rank-row .rr {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.rank-row .rr b {
+  font-variant-numeric: tabular-nums;
+}
+.tagi {
+  font-style: normal;
+  color: var(--dim);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Opponent cards of the mode views (the Duel's bots, Arm Wrestling's opponents, Backspace Brawl's bots). */
+.bot-opt {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 12px;
+  text-align: left;
+  color: var(--dim);
+  font-size: var(--t12);
+}
+.bot-opt .bname {
+  display: block;
+  font-size: var(--t16);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+.bot-opt .bname i {
+  margin-left: 12px;
+  font-style: normal;
+  font-size: var(--t12);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--dim);
+}
+.bot-opt .bstyle {
+  display: block;
+  margin-top: 2px;
+}
+.bot-opt .beat {
+  text-align: right;
+  line-height: 1.2;
+}
+.bot-opt .beat b {
+  display: block;
+  font-size: var(--t24);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.bot-opt.match .bname {
+  color: var(--info);
+}
+.bot-opt.locked {
+  opacity: 0.55;
+}
+#title-bots .bot-opt {
+  min-height: 48px;
+  padding: 4px 12px;
+}
+
+/* Narrow windows: one column. */
+#ui.narrow #scr-title {
+  grid-template-columns: 1fr;
+  align-items: start;
+  flex: none;
+  width: 100%;
+  gap: 12px;
+}
+#ui.narrow #title-left {
+  grid-column: 1;
+  gap: 12px;
+}
+#ui.narrow #title-bots {
+  grid-column: 1;
+  max-height: none;
+  overflow: visible;
+}
+#ui.narrow .logo {
+  font-size: 40px;
+  line-height: 40px;
+  letter-spacing: 4px;
+}

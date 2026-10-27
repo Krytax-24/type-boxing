@@ -1,152 +1,212 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CounterType</title>
-  <meta name="description" content="A real time typing fighting game: type faster than your opponent to hit, guard and land your ultimate.">
-  <link rel="stylesheet" href="css/countertype.dc574788e3.css">
-</head>
-<body>
-  <canvas id="arena"></canvas>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CounterType</title>
+    <meta
+      name="description"
+      content="A real time typing fighting game: type faster than your opponent to hit, guard and land your ultimate."
+    />
+  </head>
+  <body>
+    <!-- The arena fills the whole window. Everything else floats over it in #ui, which layout.js scales from a
+         1366 x 768 design size to the window. Every component fills its own part of the page: the markup here is
+         only the layers they mount into. -->
+    <canvas id="arena"></canvas>
 
-  <div id="ui" class="idle">
-    <header id="topbar">
-      <button class="fighter-chip" data-act="fighter" tabindex="-1" aria-label="Your fighter">
-        <span class="chip-swatch"></span><span class="chip-name">YOU</span><span class="chip-color"></span><span class="chip-weapon"></span>
-      </button>
-      <div class="icons">
-        <button class="icon-btn" data-act="settings" tabindex="-1" aria-label="Settings" title="Settings (S)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2h4l.6 3 2.2 1.3 2.9-1 2 3.4-2.3 2v2.6l2.3 2-2 3.4-2.9-1-2.2 1.3-.6 3h-4l-.6-3-2.2-1.3-2.9 1-2-3.4 2.3-2v-2.6l-2.3-2 2-3.4 2.9 1L9.4 5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
-        </button>
-        <button class="icon-btn" data-act="fullscreen" tabindex="-1" aria-label="Fullscreen" title="Fullscreen (F)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/></svg>
-        </button>
+    <div id="ui" class="idle">
+      <header id="topbar"></header>
+      <!-- Each game mode mounts its fight HUD here. -->
+      <div id="hud-layer"></div>
+      <!-- Shared by the fights: the big countdown and the banner between rounds. -->
+      <div id="countdown"></div>
+      <div id="round-banner" class="hidden" aria-live="polite"></div>
+      <!-- Screens (router.js): one at a time, floating over the live arena. -->
+      <div id="overlay" class="hidden">
+        <div id="keyline"></div>
       </div>
-    </header>
-
-    <div id="hud">
-      <div class="hptop left" id="hp1"></div>
-      <div id="center">
-        <div id="timer">0:00</div>
-        <div id="round-tag"></div>
-        <div id="tug"><div id="tug-fill"></div><div id="tug-mid"></div><div id="tug-knot"></div></div>
-        <div id="tug-row"><span id="tug-label">EDGE</span><span id="tug-val">0.0</span><span id="tug-unit">HP/S</span></div>
-      </div>
-      <div class="hptop right" id="hp2"></div>
-      <div class="side left" id="p1"></div>
-      <div class="side right" id="p2"></div>
-      <button id="pause-btn" class="icon-btn" data-act="pause" tabindex="-1" aria-label="Pause" title="Pause">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16" fill="currentColor"/><rect x="14" y="4" width="4" height="16" fill="currentColor"/></svg>
-      </button>
+      <!-- Modals (modals.js): pause, settings and the quit confirm, stacked over a screen or a fight. -->
+      <div id="modal" class="hidden"></div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <div id="perf" class="hidden" aria-hidden="true"></div>
     </div>
 
-    <div id="countdown"></div>
-    <div id="round-banner" class="hidden" aria-live="polite"></div>
+    <!-- Load order is by layer: kernel, core, engine, services, UI kit, shell, pages, then the plug-ins (each mode and
+         online play in its own block, with its stylesheet), and boot last. Every script registers one module with
+         CounterType.define; the kernel starts them in dependency order once the page has loaded. A module whose
+         dependency is missing is skipped on its own, so removing a plug-in block never breaks the rest.
+         Switch modules off without editing anything: index.html?disable=race,arm. -->
+    <!-- Kernel: the module system, the event bus and the registry -->
+    <script src="src/kernel/kernel.js?v=20261028a"></script>
+    <script src="src/kernel/events.js?v=20261028a"></script>
+    <script src="src/kernel/registry.js?v=20261028a"></script>
 
-    <div id="word-progress"><div id="word-progress-fill"></div></div>
-    <div id="typing-box" class="panel">
-      <div id="words">
-        <div id="words-inner"><div id="caret"></div></div>
-      </div>
-    </div>
+    <!-- Core: numbers, randomness, words, storage, themes and sound -->
+    <script src="src/core/config.js?v=20261028a"></script>
+    <script src="src/core/random.js?v=20261028a"></script>
+    <script src="src/core/words.js?v=20261028a"></script>
+    <script src="src/core/storage.js?v=20261028a"></script>
+    <script src="src/core/themes.js?v=20261028a"></script>
+    <script src="src/core/audio.js?v=20261028a"></script>
 
-    <div id="overlay">
-      <section id="scr-title" class="screen">
-        <div id="title-left">
-          <h1 class="logo" aria-label="CounterType"><span class="l1">COUNTER</span><span class="l2">TYPE</span></h1>
-          <nav id="title-menu"></nav>
-        </div>
-        <div id="title-bots" class="panel"></div>
-      </section>
+    <!-- Engine: the Duel rules (pure) and the fighters (drawing only) -->
+    <script src="src/engine/match-rules.js?v=20261028a"></script>
+    <script src="src/engine/typing.js?v=20261028a"></script>
+    <script src="src/engine/fighter.js?v=20261028a"></script>
+    <script src="src/engine/duel.js?v=20261028a"></script>
+    <script src="src/engine/animation/rig.js?v=20261028a"></script>
+    <script src="src/engine/animation/motion.js?v=20261028a"></script>
+    <script src="src/engine/animation/clips.js?v=20261028a"></script>
+    <script src="src/engine/animation/characters.js?v=20261028a"></script>
+    <script src="src/engine/animation/combos.js?v=20261028a"></script>
+    <script src="src/engine/animation/fighter-stage.js?v=20261028a"></script>
+    <script src="src/engine/renderer.js?v=20261028a"></script>
 
-      <section id="scr-howto" class="screen panel"></section>
+    <!-- Services: settings, your fighter, stats, ratings, identity and the backend swap point -->
+    <script src="src/services/settings.js?v=20261028a"></script>
+    <script src="src/services/creator.js?v=20261028a"></script>
+    <script src="src/services/player.js?v=20261028a"></script>
+    <script src="src/services/speed-history.js?v=20261028a"></script>
+    <script src="src/services/stats.js?v=20261028a"></script>
+    <script src="src/services/ranked.js?v=20261028a"></script>
+    <script src="src/services/profile.js?v=20261028a"></script>
+    <script src="src/services/backend.js?v=20261028a"></script>
 
-      <section id="scr-stats" class="screen panel"></section>
+    <!-- UI kit: the building blocks every screen uses -->
+    <link rel="stylesheet" href="src/ui/kit.css?v=20261028a" />
+    <link rel="stylesheet" href="src/ui/type-view.css?v=20261028a" />
+    <script src="src/ui/dom.js?v=20261028a"></script>
+    <script src="src/ui/format.js?v=20261028a"></script>
+    <script src="src/ui/buttons.js?v=20261028a"></script>
+    <script src="src/ui/option-row.js?v=20261028a"></script>
+    <script src="src/ui/match-rules-rows.js?v=20261028a"></script>
+    <script src="src/ui/keyline.js?v=20261028a"></script>
+    <script src="src/ui/toast.js?v=20261028a"></script>
+    <script src="src/ui/banner.js?v=20261028a"></script>
+    <script src="src/ui/clipboard.js?v=20261028a"></script>
+    <script src="src/ui/chart-hover.js?v=20261028a"></script>
+    <script src="src/ui/rank-badges.js?v=20261028a"></script>
+    <script src="src/ui/type-view.js?v=20261028a"></script>
+    <script src="src/ui/type-result.js?v=20261028a"></script>
 
-      <section id="scr-online" class="screen panel">
-        <h2 class="screen-title">Online</h2>
-        <div id="online-status"></div>
-        <div id="online-room"></div>
-        <div id="online-rules"></div>
-        <div class="online-join">
-          <input id="room-code" type="text" maxlength="7" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Room code">
-          <button class="seg" id="room-paste" data-act="online-paste" tabindex="-1">Paste</button>
-        </div>
-        <div class="btn-row" id="online-btns"></div>
-      </section>
+    <!-- Shell: the frame, screens, modals, input, the arena and the loop -->
+    <link rel="stylesheet" href="src/app/shell.css?v=20261028a" />
+    <link rel="stylesheet" href="src/app/topbar.css?v=20261028a" />
+    <script src="src/app/online-gateway.js?v=20261028a"></script>
+    <script src="src/app/modals.js?v=20261028a"></script>
+    <script src="src/app/router.js?v=20261028a"></script>
+    <script src="src/app/actions.js?v=20261028a"></script>
+    <script src="src/app/session.js?v=20261028a"></script>
+    <script src="src/app/layout.js?v=20261028a"></script>
+    <script src="src/app/arena.js?v=20261028a"></script>
+    <script src="src/app/looks.js?v=20261028a"></script>
+    <script src="src/app/keyboard.js?v=20261028a"></script>
+    <script src="src/app/loop.js?v=20261028a"></script>
+    <script src="src/app/backdrop.js?v=20261028a"></script>
+    <script src="src/app/topbar.js?v=20261028a"></script>
+    <script src="src/app/theme-tokens.js?v=20261028a"></script>
+    <script src="src/app/sound.js?v=20261028a"></script>
 
-      <section id="scr-fighter" class="screen">
-        <div id="loadout-stage" class="panel">
-          <canvas id="fighter-preview"></canvas>
-          <div id="loadout-tag"><span id="fighter-name"></span><span id="fighter-wname"></span></div>
-        </div>
-        <div id="loadout-side" class="panel">
-          <h2 class="screen-title">Choose your fighter</h2>
-          <div class="row-label active" id="label-char">Pick your fighter</div>
-          <div id="chars"></div>
-          <div id="fighter-info"></div>
-          <div class="btn-row" id="fighter-btns"></div>
-        </div>
-      </section>
+    <!-- Pages -->
+    <link rel="stylesheet" href="src/pages/home/home-page.css?v=20261028a" />
+    <script src="src/pages/home/home-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/howto/howto-page.css?v=20261028a" />
+    <script src="src/pages/howto/howto-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/fighter/fighter-page.css?v=20261028a" />
+    <script src="src/pages/fighter/fighter-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/creator/creator-page.css?v=20261028a" />
+    <script src="src/pages/creator/creator-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/stats/stats-charts.css?v=20261028a" />
+    <script src="src/pages/stats/stats-charts.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/stats/stats-page.css?v=20261028a" />
+    <script src="src/pages/stats/stats-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/profile/profile-page.css?v=20261028a" />
+    <script src="src/pages/profile/profile-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/leaderboard/leaderboard-page.css?v=20261028a" />
+    <script src="src/pages/leaderboard/leaderboard-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/queue/queue-page.css?v=20261028a" />
+    <script src="src/pages/queue/queue-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/mode-result/mode-result-page.css?v=20261028a" />
+    <script src="src/pages/mode-result/mode-result-page.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/settings/settings-modal.css?v=20261028a" />
+    <script src="src/pages/settings/settings-tabs.js?v=20261028a"></script>
+    <script src="src/pages/settings/settings-theme-tabs.js?v=20261028a"></script>
+    <script src="src/pages/settings/settings-modal.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/pause/pause-modal.css?v=20261028a" />
+    <script src="src/pages/pause/pause-modal.js?v=20261028a"></script>
+    <link rel="stylesheet" href="src/pages/confirm/confirm-modal.css?v=20261028a" />
+    <script src="src/pages/confirm/confirm-modal.js?v=20261028a"></script>
 
-      <section id="scr-creator" class="screen"></section>
+    <!-- PLUG-IN duel: Mode: Duel (the main typing fight). Delete this block and the game runs without it. -->
+    <link rel="stylesheet" href="src/modes/duel/duel-hud.css?v=20261028a" />
+    <link rel="stylesheet" href="src/modes/duel/duel-stream-view.css?v=20261028a" />
+    <link rel="stylesheet" href="src/modes/duel/duel-result-page.css?v=20261028a" />
+    <script src="src/modes/duel/duel-bots.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-practice.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-hud.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-stream-view.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-session.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-input.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-menu.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-result-page.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-online.js?v=20261028a"></script>
+    <script src="src/modes/duel/duel-mode.js?v=20261028a"></script>
+    <!-- /PLUG-IN duel -->
 
-      <section id="scr-bresult" class="screen"></section>
+    <!-- PLUG-IN race: Mode: Race. Delete this block and the game runs without it. -->
+    <link rel="stylesheet" href="src/modes/race/race.css?v=20261028a" />
+    <script src="src/modes/race/race-config.js?v=20261028a"></script>
+    <script src="src/modes/race/race-passages.js?v=20261028a"></script>
+    <script src="src/modes/race/race-rules.js?v=20261028a"></script>
+    <script src="src/modes/race/race-vehicle-art.js?v=20261028a"></script>
+    <script src="src/modes/race/race-vehicles.js?v=20261028a"></script>
+    <script src="src/modes/race/race-records.js?v=20261028a"></script>
+    <script src="src/modes/race/race-track.js?v=20261028a"></script>
+    <script src="src/modes/race/race-hud.js?v=20261028a"></script>
+    <script src="src/modes/race/race-menu.js?v=20261028a"></script>
+    <script src="src/modes/race/race-result.js?v=20261028a"></script>
+    <script src="src/modes/race/race-mode.js?v=20261028a"></script>
+    <!-- /PLUG-IN race -->
 
-      <section id="scr-mresult" class="screen"></section>
-      <section id="scr-queue" class="screen panel"></section>
-      <section id="scr-profile" class="screen panel"></section>
-      <section id="scr-leaders" class="screen panel"></section>
+    <!-- PLUG-IN arm: Mode: Arm Wrestling. Delete this block and the game runs without it. -->
+    <link rel="stylesheet" href="src/modes/arm/arm.css?v=20261028a" />
+    <script src="src/modes/arm/arm-config.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-rules.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-scene.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-records.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-hud.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-menu.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-result.js?v=20261028a"></script>
+    <script src="src/modes/arm/arm-mode.js?v=20261028a"></script>
+    <!-- /PLUG-IN arm -->
 
-      <section id="scr-result" class="screen">
-        <div id="ko-card" class="panel">
-          <div id="ko-title"></div>
-          <div id="ko-sub"></div>
-        </div>
-        <div id="result-cols"></div>
-        <div id="wpm-chart" class="panel"></div>
-        <div id="result-extra" class="panel"></div>
-        <div id="result-bots" class="panel"></div>
-        <div class="btn-row" id="result-btns"></div>
-      </section>
+    <!-- PLUG-IN brawl: Mode: Backspace Brawl (no typing; the phone mode). Delete this block and the game runs without it. -->
+    <link rel="stylesheet" href="src/modes/brawl/brawl.css?v=20261028a" />
+    <script src="src/modes/brawl/brawl-config.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-rules.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-input.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-touch.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-custom.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-fx.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-hud.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-menu.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-result-page.js?v=20261028a"></script>
+    <script src="src/modes/brawl/brawl-mode.js?v=20261028a"></script>
+    <!-- /PLUG-IN brawl -->
 
-      <div id="keyline"></div>
-    </div>
+    <!-- PLUG-IN net: Online play: private rooms over PeerJS (net-keys.js holds your relay keys and is optional). Delete this block and the game runs without it. -->
+    <link rel="stylesheet" href="src/net/net.css?v=20261028a" />
+    <script src="src/vendor/peerjs.min.js"></script>
+    <script src="src/net/net-config.js?v=20261028a"></script>
+    <script src="src/net/net-keys.js?v=20261028a"></script>
+    <script src="src/net/net-protocol.js?v=20261028a"></script>
+    <script src="src/net/net-peer.js?v=20261028a"></script>
+    <script src="src/net/net-online.js?v=20261028a"></script>
+    <script src="src/net/net-room-page.js?v=20261028a"></script>
+    <!-- /PLUG-IN net -->
 
-    <div id="modal" class="hidden">
-      <section id="mod-pause" class="modal panel"></section>
-      <section id="mod-settings" class="modal panel"></section>
-      <section id="mod-confirm" class="modal panel"></section>
-    </div>
-
-    <div id="toast" role="status" aria-live="polite"></div>
-    <div id="perf" class="hidden" aria-hidden="true"></div>
-  </div>
-
-  <div id="touch" class="hidden" aria-label="Touch controls">
-    <div id="touch-pad">
-      <button data-bit="5" class="tb ul" tabindex="-1" aria-label="Jump back">&#9702;</button>
-      <button data-bit="4" class="tb up" tabindex="-1" aria-label="Jump">&#9650;</button>
-      <button data-bit="6" class="tb ur" tabindex="-1" aria-label="Jump forward">&#9702;</button>
-      <button data-bit="1" class="tb left" tabindex="-1" aria-label="Left">&#9664;</button>
-      <button data-bit="2" class="tb right" tabindex="-1" aria-label="Right">&#9654;</button>
-      <button data-bit="9" class="tb dl" tabindex="-1" aria-label="Crouch left">&#9702;</button>
-      <button data-bit="8" class="tb down" tabindex="-1" aria-label="Crouch">&#9660;</button>
-      <button data-bit="10" class="tb dr" tabindex="-1" aria-label="Crouch right">&#9702;</button>
-    </div>
-    <div id="touch-acts">
-      <button data-bit="1024" class="tb sm q" tabindex="-1" aria-label="Projectile"><b>PROJ</b></button>
-      <button data-bit="4096" class="tb sm r" tabindex="-1" aria-label="Rising move"><b>RISE</b></button>
-      <button data-bit="2048" class="tb sm su" tabindex="-1" aria-label="Super"><b>SUPER</b></button>
-      <button data-bit="64" class="tb act hp" tabindex="-1" aria-label="High punch"><b>PUNCH</b><i>high</i></button>
-      <button data-bit="512" class="tb act hk kick" tabindex="-1" aria-label="High kick"><b>KICK</b><i>high</i></button>
-      <button data-bit="16" class="tb act lp" tabindex="-1" aria-label="Low punch"><b>PUNCH</b><i>low</i></button>
-      <button data-bit="128" class="tb act lk kick" tabindex="-1" aria-label="Low kick"><b>KICK</b><i>low</i></button>
-    </div>
-  </div>
-
-  <script src="js/vendor/peerjs.min.js"></script>
-  <script src="js/countertype.9731028590.js"></script>
-</body>
+    <!-- Boot (last): the first screen once every module has started -->
+    <script src="src/boot.js?v=20261028a"></script>
+  </body>
 </html>

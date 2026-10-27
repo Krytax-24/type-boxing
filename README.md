@@ -31,7 +31,7 @@ Type faster and cleaner than your opponent to land hits, win races and pin arms 
 9. [Controls](#controls)
 10. [Accessibility](#accessibility)
 11. [Under the hood](#under-the-hood)
-12. [What is in this branch](#what-is-in-this-branch)
+12. [Working on the code](#working-on-the-code)
 13. [Contributors](#contributors)
 14. [Credits](#credits)
 
@@ -51,11 +51,11 @@ CounterType turns typing into a contest you can watch. Every correct key you pre
 
 ## Play it now
 
-| Where | How |
-|---|---|
-| **In the browser** | Open [krytax-24.github.io/type-boxing](https://krytax-24.github.io/type-boxing/) (live once GitHub Pages is switched on for this repository). |
-| **On your computer** | Download this branch as a ZIP (**Code > Download ZIP**), unzip it and double click `index.html`. |
-| **On your own site** | Upload the files in this branch as they are to any static host: GitHub Pages, Cloudflare Pages, Netlify. |
+| Where                | How                                                                                                                                                                                        |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **In the browser**   | Open [krytax-24.github.io/type-boxing](https://krytax-24.github.io/type-boxing/) (live once GitHub Pages is switched on for this repository).                                              |
+| **On your computer** | Download this repository as a ZIP (**Code > Download ZIP**), unzip it and double click `index.html`. For online rooms, serve it over http: `npm start`, then open `http://localhost:8080`. |
+| **On your own site** | Upload the files as they are to any static host (GitHub Pages, Cloudflare Pages, Netlify), or a joined, hashed copy made by `npm run build`.                                               |
 
 Works in current versions of Chrome, Edge and Firefox on a desktop or laptop. On phones, Backspace Brawl is playable with touch controls; the typing modes need a physical keyboard.
 
@@ -73,14 +73,14 @@ Each player types their own endless stream of words. The word you need to type f
 
 **How a Duel is won**
 
-| Rule | What it means |
-|---|---|
-| **Speed is power** | Your power is your typing speed over the last few seconds. The faster typist deals damage; the gap decides how much. |
-| **Speed heals** | Typing also heals you a little, but healing fades out as the fight goes on, so every fight ends. |
-| **Combos** | Every clean word (no wrong key) adds to your combo and gives a small power boost. A mistake halves the combo. |
-| **Counter** | Break a long combo and your opponent gets a **COUNTER STRIKE**: instant damage and a short power boost. |
-| **Ultimate** | Fill the gold bar and build a combo of 10 clean words, and a hard gold word appears. Type it clean for 30 damage and a 2 second stun. One wrong key and it fires sloppy, for 12 damage and no stun. |
-| **K.O.** | First to 0 HP loses. With a round timer, the higher HP wins when time runs out. |
+| Rule               | What it means                                                                                                                                                                                       |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Speed is power** | Your power is your typing speed over the last few seconds. The faster typist deals damage; the gap decides how much.                                                                                |
+| **Speed heals**    | Typing also heals you a little, but healing fades out as the fight goes on, so every fight ends.                                                                                                    |
+| **Combos**         | Every clean word (no wrong key) adds to your combo and gives a small power boost. A mistake halves the combo.                                                                                       |
+| **Counter**        | Break a long combo and your opponent gets a **COUNTER STRIKE**: instant damage and a short power boost.                                                                                             |
+| **Ultimate**       | Fill the gold bar and build a combo of 10 clean words, and a hard gold word appears. Type it clean for 30 damage and a 2 second stun. One wrong key and it fires sloppy, for 12 damage and no stun. |
+| **K.O.**           | First to 0 HP loses. With a round timer, the higher HP wins when time runs out.                                                                                                                     |
 
 <table>
 <tr>
@@ -95,26 +95,26 @@ Each player types their own endless stream of words. The word you need to type f
 
 **Ways to play a Duel**
 
-| Option | What it is |
-|---|---|
-| **Bots** | Eight opponents. The number on each card is the speed it really types at about 95% accuracy, so if you match it you win about half the time. |
-| **Endless** | Fight one bot with no timer and no rounds. Wins are tallied and a new fight starts after a short break. |
-| **Practice** | Set up a dummy: its speed (0 or 15 to 120 wpm), its accuracy, and whether either of you can lose HP. |
-| **Ranked** | A one round match against an opponent near your rating (see [Ranked](#ranked-profile-and-leaderboards)). |
-| **Online room** | A private 1v1 against a friend (see [Online play](#online-play)). |
+| Option          | What it is                                                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bots**        | Eight opponents. The number on each card is the speed it really types at about 95% accuracy, so if you match it you win about half the time. |
+| **Endless**     | Fight one bot with no timer and no rounds. Wins are tallied and a new fight starts after a short break.                                      |
+| **Practice**    | Set up a dummy: its speed (0 or 15 to 120 wpm), its accuracy, and whether either of you can lose HP.                                         |
+| **Ranked**      | A one round match against an opponent near your rating (see [Ranked](#ranked-profile-and-leaderboards)).                                     |
+| **Online room** | A private 1v1 against a friend (see [Online play](#online-play)).                                                                            |
 
 **Match rules**: best of 1 to 5 rounds, a round timer of 30, 45, 60 or 120 seconds (or none), and word submit **On** (press Space after each word), **Off** (a word ends by itself when it is exactly right) or **Mix** (each player uses their own setting).
 
-| Opponent | Style | Speed |
-|---|---|---|
-| TRAINEE | Just learning | 15 wpm |
-| ROOKIE | Careful and slow | 30 wpm |
-| SCRAPPER | Sloppy brawler | 45 wpm |
-| TECHNICIAN | Steady combo builder | 60 wpm |
-| DUELIST | Balanced all-rounder | 80 wpm |
-| BERSERKER | Fast, wild bursts | 100 wpm |
-| WARLORD | Heavy-hitting boss | 120 wpm |
-| MATCH ME | Your last 3 matches | Your average speed (unlocks after your first match) |
+| Opponent   | Style                | Speed                                               |
+| ---------- | -------------------- | --------------------------------------------------- |
+| TRAINEE    | Just learning        | 15 wpm                                              |
+| ROOKIE     | Careful and slow     | 30 wpm                                              |
+| SCRAPPER   | Sloppy brawler       | 45 wpm                                              |
+| TECHNICIAN | Steady combo builder | 60 wpm                                              |
+| DUELIST    | Balanced all-rounder | 80 wpm                                              |
+| BERSERKER  | Fast, wild bursts    | 100 wpm                                             |
+| WARLORD    | Heavy-hitting boss   | 120 wpm                                             |
+| MATCH ME   | Your last 3 matches  | Your average speed (unlocks after your first match) |
 
 <img src="docs/readme/pause.jpg" alt="The pause menu: Resume, Restart, Settings, Quit to menu" width="49%"> <img src="docs/readme/how-to-play.jpg" alt="The How to play screen" width="49%">
 
@@ -149,18 +149,18 @@ Places go by **finish time plus penalties**, so a clean racer who crosses the li
 - **Effects**: wheels spin and speed lines grow with your live speed, a typo makes your vehicle wobble and smoke, 10 clean words in a row fire a nitro boost (bikes pull a wheelie), and the finish line throws sparks.
 - **Tab** starts a new race straight away in practice.
 
-| Vehicle | Type | Unlock |
-|---|---|---|
-| Lime Arrow | Car | Open |
-| Ninety-Six | Car | Open |
-| Shadow 1000 | Bike | Open |
-| Snowline 600 | Bike | Open |
-| Ice Coupe | Car | 3 races |
-| Teal Corsa | Bike | 6 races |
-| White Fang | Car | 10 races |
-| Ruby 400 | Car | 15 races |
+| Vehicle      | Type | Unlock   |
+| ------------ | ---- | -------- |
+| Lime Arrow   | Car  | Open     |
+| Ninety-Six   | Car  | Open     |
+| Shadow 1000  | Bike | Open     |
+| Snowline 600 | Bike | Open     |
+| Ice Coupe    | Car  | 3 races  |
+| Teal Corsa   | Bike | 6 races  |
+| White Fang   | Car  | 10 races |
+| Ruby 400     | Car  | 15 races |
 | Orange Blaze | Bike | 20 races |
-| Stealth V12 | Car | 30 races |
+| Stealth V12  | Car  | 30 races |
 
 ---
 
@@ -183,14 +183,14 @@ Both sides type their own stream of words while two wrestlers lock hands at a ta
 </tr>
 </table>
 
-| Opponent | Style | Speed | Accuracy |
-|---|---|---|---|
-| GREENHORN | Slow and shaky | 25 wpm | 93% |
-| CLERK | Careful, never rushes | 40 wpm | 98.5% |
-| SURGEON | Slow hands, no slips | 55 wpm | 99.5% |
-| BRUISER | Fast but sloppy | 75 wpm | 91% |
-| IRONGRIP | Quick and clean | 80 wpm | 97% |
-| TITAN | The final boss | 105 wpm | 98.5% |
+| Opponent  | Style                 | Speed   | Accuracy |
+| --------- | --------------------- | ------- | -------- |
+| GREENHORN | Slow and shaky        | 25 wpm  | 93%      |
+| CLERK     | Careful, never rushes | 40 wpm  | 98.5%    |
+| SURGEON   | Slow hands, no slips  | 55 wpm  | 99.5%    |
+| BRUISER   | Fast but sloppy       | 75 wpm  | 91%      |
+| IRONGRIP  | Quick and clean       | 80 wpm  | 97%      |
+| TITAN     | The final boss        | 105 wpm | 98.5%    |
 
 The match is drawn live: the hands follow a springy pull with a little overshoot, faces go red and veins show under strain, a typo jerks your hand back, and the crowd bobs with the tension and cheers at the end.
 
@@ -306,13 +306,13 @@ The default look is **Terminal Arcade**: a retro computer lab and arcade world i
 </tr>
 </table>
 
-| Tab | What you can change |
-|---|---|
-| **Game** | Over-head or Classic view, word submit on or off, damage numbers, starting side (left or right), playing hand for Backspace Brawl, sound volume. |
+| Tab          | What you can change                                                                                                                                                                                                   |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Game**     | Over-head or Classic view, word submit on or off, damage numbers, starting side (left or right), playing hand for Backspace Brawl, sound volume.                                                                      |
 | **Graphics** | Quality preset (Low, Medium, High), render scale, background scenery (full, simple, off), frame rate limit, FPS counter, effect limit, reduce motion, screen shake strength, fullscreen, interface size, HUD opacity. |
-| **Theme** | Eight presets, eleven color slots, share codes. |
-| **Custom** | A background image (a link or a file from your computer) and custom CSS. |
-| **Keys** | Every key in every mode, in one list. |
+| **Theme**    | Eight presets, eleven color slots, share codes.                                                                                                                                                                       |
+| **Custom**   | A background image (a link or a file from your computer) and custom CSS.                                                                                                                                              |
+| **Keys**     | Every key in every mode, in one list.                                                                                                                                                                                 |
 
 ---
 
@@ -320,16 +320,16 @@ The default look is **Terminal Arcade**: a retro computer lab and arcade world i
 
 Every action has a key **and** a button. Clicking a button never takes focus away from your typing.
 
-| Where | Keys |
-|---|---|
-| **Home** | **Enter** Duel, **R** Race, **A** Arm Wrestling, **B** Backspace Brawl, **P** Profile, **L** Leaderboards, **H** How to play, **S** Settings, **F** Fullscreen |
-| **Duel menu** | **Enter** Fight, **B** Bots, **E** Endless, **P** Practice, **K** Ranked, **O** Online room, **1** to **8** pick an opponent, **C** Fighter |
-| **Typing** | Letters type, **Space** ends a word, **Backspace** fixes a letter, **Ctrl + Backspace** clears the whole word |
-| **Duel** | **F2** switches between Over-head and Classic view |
-| **Race and Arm Wrestling** | **Tab** starts a new race or match (practice only); **Tab** or **Enter** on the result starts the next one |
-| **Any fight** | **Esc** pauses (leaving the tab or window pauses too). In the pause menu: **Enter** resume, **R** restart, **S** settings, **Q** quit |
-| **Backspace Brawl, right hand** | Arrow keys move, **A** high punch, **S** low punch, **Z** high kick, **X** low kick, **Q** projectile, **R** rising move, **Q + R** super |
-| **Backspace Brawl, left hand** | **W A S D** move, **;** high punch, **L** low punch, **/** high kick, **.** low kick, **P** projectile, **O** rising move, **P + O** super |
+| Where                           | Keys                                                                                                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Home**                        | **Enter** Duel, **R** Race, **A** Arm Wrestling, **B** Backspace Brawl, **P** Profile, **L** Leaderboards, **H** How to play, **S** Settings, **F** Fullscreen |
+| **Duel menu**                   | **Enter** Fight, **B** Bots, **E** Endless, **P** Practice, **K** Ranked, **O** Online room, **1** to **8** pick an opponent, **C** Fighter                    |
+| **Typing**                      | Letters type, **Space** ends a word, **Backspace** fixes a letter, **Ctrl + Backspace** clears the whole word                                                  |
+| **Duel**                        | **F2** switches between Over-head and Classic view                                                                                                             |
+| **Race and Arm Wrestling**      | **Tab** starts a new race or match (practice only); **Tab** or **Enter** on the result starts the next one                                                     |
+| **Any fight**                   | **Esc** pauses (leaving the tab or window pauses too). In the pause menu: **Enter** resume, **R** restart, **S** settings, **Q** quit                          |
+| **Backspace Brawl, right hand** | Arrow keys move, **A** high punch, **S** low punch, **Z** high kick, **X** low kick, **Q** projectile, **R** rising move, **Q + R** super                      |
+| **Backspace Brawl, left hand**  | **W A S D** move, **;** high punch, **L** low punch, **/** high kick, **.** low kick, **P** projectile, **O** rising move, **P + O** super                     |
 
 ---
 
@@ -353,44 +353,76 @@ CounterType is built with **plain HTML, CSS and JavaScript**: no framework, no b
 
 <br>
 
-The source is split into small parts that each do one job. Game rules never touch the screen or the clock, so they can be tested on their own, and each game mode is a plug-in that can be added or removed by adding or removing its script tags.
+Every file is one small module with a written list of the modules it uses (`CounterType.define(id, dependencies, factory)`), and the only global is `CounterType`. Modules sit in layers that only depend downward, so a change can only reach the modules that list it. Game rules never touch the screen, the clock or `Math.random`, so they can be tested on their own.
 
 ```
-js/core/        settings and numbers, themes, word lists, sound, the component registry
-js/engine/      the Duel rules, the typing engine, the bots, the fighter rig and animation, the renderer
-js/services/    stats, ranked ratings and seasons, the player profile, the backend (a stand-in for now)
-js/ui/          the typing view, result and queue screens, stats, profile and leaderboard pages, fighter creator
-js/app/         the shell: screens, menus, keyboard and mouse, the HUD and the main loop
-js/modes/race/  Race rules, passages, vehicles and the race screen          (plug-in)
-js/modes/arm/   Arm Wrestling rules, the wrestling scene and its screen     (plug-in)
-js/modes/brawl/ Backspace Brawl rules, input (keys, gamepad, touch), screen (plug-in)
-js/net/         online rooms: the message format, the connection, the room screen (plug-in)
+src/kernel/         the module system, the event bus, the registry of extension points
+src/core/           numbers (config), randomness, words, storage, themes, sound
+src/engine/         the Duel rules, the typing engine and the fighters (rig, motion, clips, characters, renderer)
+src/services/       settings, your fighter, stats, ratings, profile, the backend stand-in
+src/ui/             the UI kit every screen uses
+src/app/            the shell: router, modals, actions, session, layout, arena, keyboard, main loop
+src/pages/          one folder per screen or modal: home, how to play, fighter, creator, stats, profile, ...
+src/modes/duel/     the Duel: session, HUD, input, menu, bots, practice, result         (plug-in)
+src/modes/race/     Race rules, passages, vehicles, track and screens                     (plug-in)
+src/modes/arm/      Arm Wrestling rules, the wrestling scene and screens                  (plug-in)
+src/modes/brawl/    Backspace Brawl rules, input (keys, gamepad, touch) and screens       (plug-in)
+src/net/            online rooms: the message format, the connection, the room screen     (plug-in)
 ```
 
-- **Plug and play**: every mode and the online layer register themselves with a small registry when they load. The rest of the game only talks to them through it, so removing a mode or the whole online layer leaves a game that still works.
+- **Plug and play**: each mode and the online layer is one block in `index.html` and never depends on another plug-in. Delete a block, switch it off with `index.html?disable=race`, or leave it out of a build with `node tools/build.js --without race`; the menus, How to play, the keys table and the profile adapt by themselves.
 - **Deterministic rules**: the Duel runs on a fixed 1/120 second step from a shared seed and never reads real time, which is what makes host-judged online play and repeatable tests possible.
-- **Tested**: headless test suites check the Duel rules and calibrate every bot so the speed on its card is the speed it really types, then check the Race, Arm Wrestling, ranked, Brawl, online messages and the plug-in structure.
-- **Fast**: scenery is painted once into offscreen layers and slid for parallax, vehicles are cached sprites, and the production build is one minified script and one stylesheet.
+- **Tested**: 9 headless suites (445 checks) cover the module system, the structure rules, every mode's rules, the online messages and ranked, and 25 recorded matches must replay exactly. Each bot is calibrated so the speed on its card is the speed it really types.
+- **Fast**: scenery is painted once into offscreen layers and slid for parallax, and vehicles are cached sprites.
 
 </details>
 
 ---
 
-## What is in this branch
+## Working on the code
 
-This branch holds the **production build**, ready to host or to play by double click.
+The game needs nothing installed. The development tools need [Node.js](https://nodejs.org) 18 or newer:
 
 ```
-index.html                      the game
-css/countertype.<hash>.css      every stylesheet, joined and minified
-js/countertype.<hash>.js        every script, joined and minified
-js/vendor/peerjs.min.js         PeerJS, for online rooms (MIT license, see peerjs.LICENSE.txt)
-docs/readme/                    the pictures in this README (not needed to play)
-README.md                       this file
-BUILD.txt                       when and how this build was made
+npm install            ESLint and Prettier (dev only; the game itself has no dependencies)
+npm test               every test suite          npm run test:quick   the rule checks only, a few seconds
+npm run lint           ESLint                    npm run format       Prettier
+npm run health         the full health check (tests, lint, format, and browser checks when Playwright is installed)
+npm run build          a joined, hashed production copy in dist/ (node tools/build.js --without race leaves plug-ins out)
+npm run bump           new cache tags (?v=) on every file in index.html, so browsers load a new delivery
 ```
 
-The file names carry a content hash, so browsers always load the newest build after an update.
+- **Relay keys**: online rooms work on direct connections. For relay (TURN) servers, copy `src/net/net-keys.example.js` to `src/net/net-keys.js` and fill in your keys; that file stays out of git.
+- **Before calling a change done**: `npm run test:quick`, `npm run lint`, `npm run format:check`, and `npm run health` for anything that touches the page.
+- **Read more**: [ARCHITECTURE.md](ARCHITECTURE.md) (layers, module contracts, events, recipes for adding or removing a part), [HEALTH-REPORT.md](HEALTH-REPORT.md) (the code audit and how v2 was verified), [CHANGELOG.md](CHANGELOG.md).
+
+<details>
+<summary><b>Moving from the October 2026 layout</b></summary>
+
+<br>
+
+| Before (js/, css/)                                                                                        | Now (src/)                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core/app.js` (registry and events)                                                                       | `kernel/kernel.js`, `kernel/registry.js`, `kernel/events.js`                                                                                                                                                                                                                                                                                                                       |
+| `core/config.js`                                                                                          | `core/config.js`, plus `race-config.js`, `arm-config.js`, `brawl-config.js`, `net-config.js` in their plug-ins                                                                                                                                                                                                                                                                     |
+| `core/sfx.js`                                                                                             | `core/audio.js` (and `app/sound.js` applies the sound settings)                                                                                                                                                                                                                                                                                                                    |
+| `engine/modes.js`, `engine/duel-typing.js`, `engine/render.js`                                            | `engine/match-rules.js`, `engine/typing.js`, `engine/renderer.js`                                                                                                                                                                                                                                                                                                                  |
+| `engine/anim-rig.js`, `anim-move.js`, `anim-clips.js`, `anim-chars.js`, `anim-combos.js`, `duel-chars.js` | `engine/animation/rig.js`, `motion.js`, `clips.js`, `characters.js`, `combos.js`, `fighter-stage.js`                                                                                                                                                                                                                                                                               |
+| `app/*.js` (the shell: 10 files, about 1,700 dense lines sharing about 75 global variables)               | `app/` (router, modals, actions, session, layout, arena, looks, keyboard, loop, backdrop, topbar, theme tokens, sound, online gateway), `pages/` (home, how to play, fighter, settings, pause, confirm), `modes/duel/` (the Duel's flow, HUD, menu, input, result), `services/settings.js`, `player.js`, `speed-history.js`, `ui/` (buttons, option rows, key line, toast, banner) |
+| `ui/mtype.js`                                                                                             | `ui/type-view.js` and `ui/type-result.js`                                                                                                                                                                                                                                                                                                                                          |
+| `ui/mode-ui.js`                                                                                           | `pages/mode-result/mode-result-page.js` and `pages/queue/queue-page.js`                                                                                                                                                                                                                                                                                                            |
+| `ui/stats-page.js`, `profile-page.js`, `leaderboard-page.js`                                              | `pages/stats/` (with `stats-charts.js`), `pages/profile/`, `pages/leaderboard/`                                                                                                                                                                                                                                                                                                    |
+| `ui/creator.js`                                                                                           | `services/creator.js` (your fighters' data) and `pages/creator/creator-page.js` (the screen)                                                                                                                                                                                                                                                                                       |
+| `modes/race/race.js`, `passages.js`, `vehicles.js`, `vehicle-art.js`, `race-game.js`                      | `modes/race/race-rules.js`, `race-passages.js`, `race-vehicles.js`, `race-vehicle-art.js`, and `race-mode.js` with `race-hud.js`, `race-menu.js`, `race-track.js`, `race-result.js`, `race-records.js`                                                                                                                                                                             |
+| `modes/arm/armwrestle.js`, `arm-scene.js`, `arm-game.js`                                                  | `modes/arm/arm-rules.js`, `arm-scene.js`, and `arm-mode.js` with `arm-hud.js`, `arm-menu.js`, `arm-result.js`, `arm-records.js`                                                                                                                                                                                                                                                    |
+| `modes/brawl/brawl.js`, `brawl-input.js`, `brawl-game.js`                                                 | `modes/brawl/brawl-rules.js`, `brawl-input.js`, `brawl-touch.js`, and `brawl-mode.js` with `brawl-hud.js`, `brawl-menu.js`, `brawl-fx.js`, `brawl-result-page.js`, `brawl-custom.js`                                                                                                                                                                                               |
+| `net/protocol.js`, `net.js`, `online.js`                                                                  | `net/net-protocol.js`, `net-peer.js`, `net-online.js` and `net-room-page.js` (the Duel's own online part is `modes/duel/duel-online.js`)                                                                                                                                                                                                                                           |
+| `css/core.css`, `css/ui/*.css`, `css/modes/*.css`, `css/net.css`                                          | one stylesheet next to each component                                                                                                                                                                                                                                                                                                                                              |
+| `tools/release.js`, `tests/load.js`                                                                       | `tools/build.js`, `tests/support/loader.js`                                                                                                                                                                                                                                                                                                                                        |
+
+Saved data (settings, records, profile, custom fighters, themes) keeps the same browser storage keys, so nothing is lost when you switch.
+
+</details>
 
 ---
 
@@ -408,8 +440,8 @@ CounterType is made by:
 - The typing feel is inspired by [Monkeytype](https://monkeytype.com).
 - The idea of a typing beat 'em up was inspired by "Keyboard Warrior Stickman"; no art, characters, names or music were copied from it.
 - The fighters, the arena, the arm wrestlers and the club are original, drawn in code.
-- The race car and bike pictures are illustrations collected for this prototype; their artists keep the rights.
-- Online rooms use [PeerJS](https://peerjs.com) (MIT license).
+- The race car and bike pictures are illustrations collected for this prototype; their artists keep the rights. Replace or license them before a public launch.
+- Online rooms use [PeerJS](https://peerjs.com) (MIT license, `src/vendor/peerjs.LICENSE.txt`).
 
 <div align="center">
 <br>

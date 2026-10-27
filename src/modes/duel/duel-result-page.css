@@ -1,0 +1,121 @@
+/* Duel result (#scr-result): the K.O. card, both typists' numbers, the speed chart, the extras or the ranked
+   update, and what comes next (another opponent, the practice dummy, the online rematch). */
+#scr-result {
+  width: 704px;
+  gap: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+#scr-result::-webkit-scrollbar {
+  width: 8px;
+}
+#scr-result::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: var(--r);
+}
+#ko-card {
+  padding: 12px 24px 8px;
+  text-align: center;
+}
+#ko-title {
+  font-size: var(--t64);
+  line-height: 64px;
+  font-weight: 700;
+  letter-spacing: 8px;
+}
+#ko-title.win {
+  color: var(--phosphor);
+  text-shadow: 4px 0 0 var(--magenta);
+}
+#ko-title.lose {
+  color: var(--danger);
+  text-shadow: 4px 0 0 rgba(var(--text-rgb), 0.25);
+}
+#ko-sub {
+  margin-top: 4px;
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+}
+#result-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+#wpm-chart {
+  padding: 8px 16px;
+}
+#wpm-chart svg {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  overflow: visible;
+}
+#wpm-chart svg.speed {
+  height: 64px;
+}
+#wpm-chart svg.hpline {
+  height: 22px;
+  margin-top: 4px;
+}
+#wpm-chart .chart-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+#wpm-chart .key-i {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+#wpm-chart .key-i i {
+  display: inline-block;
+  width: 16px;
+  height: 2px;
+}
+#result-extra {
+  padding: 8px 16px;
+}
+#result-extra .mr-ranked {
+  padding: 0;
+}
+#result-bots {
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+#result-bots:empty {
+  display: none;
+}
+#result-bots .card-label {
+  grid-column: 1 / -1;
+  padding-left: 4px;
+}
+.bot-chip {
+  height: 40px;
+  padding: 0 4px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  font-size: var(--t12);
+  color: var(--dim);
+  line-height: 1.2;
+}
+.bot-chip b {
+  color: var(--text);
+  font-size: var(--t12);
+  letter-spacing: 1px;
+}
+#ui.narrow #scr-result {
+  width: 100%;
+  max-height: none;
+}
+#ui.narrow #result-cols {
+  grid-template-columns: 1fr;
+}
+#ui.narrow #result-bots {
+  grid-template-columns: repeat(3, 1fr);
+}

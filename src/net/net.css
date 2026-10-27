@@ -1,0 +1,123 @@
+/* Online play (src/net): the private room screen (net-room-page.js) and the ping badge (net-online.js). */
+/* Online private room */
+#scr-online {
+  width: 560px;
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  padding: 20px 24px;
+  gap: 12px;
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+#online-status {
+  min-height: 24px;
+  font-size: var(--t16);
+  line-height: 1.5;
+  color: var(--text);
+}
+#online-room {
+  display: grid;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(var(--surface-rgb), 0.45);
+  border-left: 4px solid var(--info);
+  border-radius: var(--r);
+  font-size: var(--t12);
+  color: var(--dim);
+}
+#online-room b {
+  display: block;
+  font-size: var(--t32);
+  letter-spacing: 8px;
+  color: var(--phosphor);
+}
+#online-room code {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* The room code and invite link can be selected with the mouse and copied; the rest of the game stays unselectable. */
+.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+.selectable::selection {
+  background: var(--magenta);
+  color: var(--bg);
+}
+.copy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#online-rules {
+  display: grid;
+  gap: 8px;
+}
+.online-join {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.online-join .seg {
+  height: 48px;
+  min-width: 88px;
+}
+.online-join input {
+  flex: 1;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+  height: 48px;
+  padding: 0 16px;
+  color: var(--text);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+  font: 700 var(--t24) var(--font);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  outline: none;
+}
+.online-join input:focus {
+  border-color: var(--magenta);
+  box-shadow: inset 4px 0 0 var(--magenta);
+}
+#scr-online .btn-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* Online ping badge */
+#ping-badge {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  z-index: 30;
+  padding: 2px 8px;
+  font:
+    600 11px/1.6 ui-monospace,
+    Consolas,
+    monospace;
+  letter-spacing: 0.04em;
+  color: #cfd6e4;
+  background: rgba(10, 12, 18, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+}
+#ping-badge[hidden] {
+  display: none;
+}
+#ping-badge[data-q="good"] {
+  color: #7be39a;
+}
+#ping-badge[data-q="fair"] {
+  color: #f2c35b;
+}
+#ping-badge[data-q="bad"] {
+  color: #ff7b72;
+}
+#ui.narrow #scr-online {
+  width: 100%;
+  max-height: none;
+}

@@ -1,0 +1,524 @@
+/* Duel HUD (duel-hud.js), versus style: the HP plates across the top (yours left, the opponent's right, mirrored),
+   the clock and the edge rope between them, each player's numbers in their bottom corner, and the thin progress
+   line of your current word (Over-head view). Shown only while the Duel owns the view. */
+#hud {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+#ui[data-mode="duel"]:not(.idle) #hud {
+  visibility: visible;
+}
+#ui.idle #pause-btn {
+  display: none;
+}
+
+.side {
+  --id: var(--you);
+  position: absolute;
+  bottom: 16px;
+  width: 432px;
+  padding: 12px 16px;
+  background: var(--hud-bg);
+  border: var(--border);
+  border-radius: var(--r);
+  border-bottom: 4px solid var(--id);
+}
+.side.left {
+  left: 16px;
+}
+.side.right {
+  right: 16px;
+  --id: var(--foe);
+}
+
+/* Top: the HP plates, each from its screen edge to the clock. */
+.hptop {
+  --id: var(--you);
+  position: absolute;
+  top: 12px;
+  width: calc(50% - 192px);
+  padding: 8px 16px 10px;
+  background: var(--hud-bg);
+  border: var(--border);
+  border-radius: var(--r);
+  border-top: 4px solid var(--id);
+}
+.hptop.left {
+  left: 16px;
+}
+.hptop.right {
+  right: 16px;
+  --id: var(--foe);
+}
+.nameplate {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.right .nameplate {
+  flex-direction: row-reverse;
+}
+.who {
+  display: flex;
+  flex-direction: column;
+  padding-left: 8px;
+  border-left: 4px solid var(--id);
+}
+.right .who {
+  padding: 0 8px 0 0;
+  border-left: 0;
+  border-right: 4px solid var(--id);
+  text-align: right;
+}
+.pname {
+  font-size: var(--t16);
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 2px;
+  color: var(--id);
+}
+.pweapon {
+  margin-top: 4px;
+  font-size: var(--t12);
+  line-height: 12px;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.hpnum {
+  font-size: var(--t24);
+  font-weight: 700;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hpbar {
+  position: relative;
+  margin-top: 6px;
+  height: 28px;
+  background: var(--track);
+  border: var(--border);
+  overflow: hidden;
+  transform: skewX(-20deg);
+}
+.right .hpbar {
+  transform: scaleX(-1) skewX(-20deg);
+}
+.hpghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: var(--text);
+  opacity: 0.45;
+}
+.hpfill {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  background: var(--phosphor);
+  transition: width 0.1s linear;
+}
+.right .hpfill {
+  background: var(--foe);
+}
+.hpfill.low,
+.right .hpfill.low {
+  background: var(--warn);
+}
+.hpfill.crit,
+.right .hpfill.crit {
+  background: var(--danger);
+}
+
+.stats {
+  position: relative;
+  margin-top: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  height: 32px;
+}
+.side.right .stats {
+  flex-direction: row-reverse;
+}
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.stat b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.wpm b {
+  font-size: var(--t32);
+  line-height: 32px;
+}
+.power {
+  position: static;
+} /* the COUNTER badge is placed on the panel's top edge */
+.power b {
+  font-size: var(--t24);
+  line-height: 24px;
+}
+.stun {
+  align-self: center;
+  font-size: var(--t16);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--danger);
+}
+.healtag {
+  margin-left: 8px;
+  font-size: var(--t12);
+  line-height: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--phosphor);
+  font-variant-numeric: tabular-nums;
+}
+/* COUNTER badge: sits on the panel's top edge and takes no space in the stats row. */
+.countertag {
+  position: absolute;
+  top: -11px;
+  left: 24px;
+  visibility: hidden;
+  padding: 0 8px;
+  border-radius: var(--r);
+  font-size: var(--t12);
+  line-height: 20px;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--magenta);
+  white-space: nowrap;
+}
+.side.right .countertag {
+  left: auto;
+  right: 24px;
+}
+.countertag.on {
+  visibility: visible;
+}
+
+.meters {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 16px;
+}
+.side.right .meters {
+  flex-direction: row-reverse;
+}
+.combo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.side.right .combo {
+  flex-direction: row-reverse;
+}
+.combo b {
+  display: inline-block;
+  min-width: 32px;
+  font-size: var(--t16);
+  color: var(--id);
+  font-variant-numeric: tabular-nums;
+}
+.combo.pop b {
+  animation: pop 0.25s var(--ease);
+}
+@keyframes pop {
+  from {
+    transform: scale(1.5);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+.combo.broke b {
+  animation: broke 0.4s ease-out;
+}
+@keyframes broke {
+  0% {
+    color: var(--danger);
+    transform: translateX(-4px);
+  }
+  25% {
+    transform: translateX(4px);
+  }
+  50% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: none;
+  }
+}
+.pips {
+  display: flex;
+  gap: 4px;
+}
+.side.right .pips {
+  flex-direction: row-reverse;
+}
+.pip {
+  width: 16px;
+  height: 12px;
+  background: var(--track);
+  transform: skewX(-20deg);
+}
+.pip.on {
+  background: var(--id);
+}
+.pip.half {
+  background: linear-gradient(90deg, var(--id) 50%, var(--track) 50%);
+} /* the typo rule takes half a word of streak at a time */
+
+.ultrow {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.side.right .ultrow {
+  flex-direction: row-reverse;
+}
+.ultbar {
+  flex: 1;
+  height: 12px;
+  background: var(--track);
+  overflow: hidden;
+  transform: skewX(-20deg);
+}
+.side.right .ultbar {
+  transform: scaleX(-1) skewX(-20deg);
+}
+.ultfill {
+  height: 100%;
+  width: 0;
+  background: var(--gold);
+  opacity: 0.55;
+}
+.ultfill.ready {
+  opacity: 1;
+}
+.ulttext {
+  min-width: 128px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.side.right .ulttext {
+  text-align: right;
+}
+.ulttext.ready {
+  color: var(--gold);
+  font-weight: 700;
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Top center: the fight clock and your edge, a tug-of-war rope. The knot slides toward whoever is winning. */
+#center {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 352px;
+  margin-left: -176px;
+  padding: 6px 16px 8px;
+  text-align: center;
+  background: var(--hud-bg);
+  border: var(--border);
+  border-radius: var(--r);
+}
+#timer {
+  font-size: var(--t32);
+  font-weight: 700;
+  line-height: 32px;
+  text-shadow: var(--outline);
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+#round-tag {
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+  text-shadow: var(--outline);
+  min-height: 16px;
+}
+#tug {
+  position: relative;
+  height: 24px;
+  margin-top: 4px;
+}
+#tug::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 6px;
+  background: var(--track);
+}
+#tug-mid {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 2px;
+  height: 20px;
+  margin-left: -1px;
+  background: var(--line);
+}
+#tug-fill {
+  position: absolute;
+  top: 9px;
+  height: 6px;
+  left: 50%;
+  width: 0;
+  background: var(--dim);
+}
+#tug-knot {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  width: 12px;
+  height: 20px;
+  margin-left: -6px;
+  background: var(--text);
+  transform: skewX(-20deg);
+  transition: left 0.15s linear;
+}
+#tug.lead #tug-fill,
+#tug.lead #tug-knot {
+  background: var(--you);
+}
+#tug.trail #tug-fill,
+#tug.trail #tug-knot {
+  background: var(--foe);
+}
+#tug-row {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+#tug-val {
+  min-width: 80px;
+  font-size: var(--t24);
+  font-weight: 700;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+#tug-label,
+#tug-unit {
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+}
+
+/* Pause sits inside the clock panel, at the right end of the edge row, so it never crowds the HP numbers or covers
+   the word plates. */
+#pause-btn {
+  position: absolute;
+  top: 98px;
+  left: calc(50% + 176px - 58px);
+  height: 28px;
+  padding: 0 6px;
+  gap: 4px;
+}
+#pause-btn svg {
+  width: 16px;
+  height: 16px;
+}
+#pause-btn kbd {
+  min-width: 0;
+  padding: 0 4px;
+  line-height: 18px;
+}
+
+/* Over-head view: the word plates are on the canvas; a thin progress line sits at the bottom. */
+#word-progress {
+  display: none;
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  width: 400px;
+  margin-left: -200px;
+  height: 6px;
+  background: var(--track);
+  border: var(--border);
+  overflow: hidden;
+}
+#word-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--you-letters);
+  transition: width 0.07s linear;
+}
+#word-progress-fill.ult {
+  background: var(--gold);
+}
+#ui[data-mode="duel"]:not(.classic):not(.idle) #word-progress {
+  display: block;
+}
+
+/* Starting side: right. You stand on the right, so your HUD plates sit there and keep your colors. */
+#ui.mirror .hptop.left,
+#ui.mirror .side.left {
+  --id: var(--foe);
+}
+#ui.mirror .hptop.right,
+#ui.mirror .side.right {
+  --id: var(--you);
+}
+#ui.mirror .hptop.left .hpfill {
+  background: var(--foe);
+}
+#ui.mirror .hptop.right .hpfill {
+  background: var(--phosphor);
+}
+#ui.mirror .hptop.left .hpfill.low {
+  background: var(--warn);
+}
+#ui.mirror .hptop.right .hpfill.low {
+  background: var(--warn);
+}
+#ui.mirror .hptop.left .hpfill.crit {
+  background: var(--danger);
+}
+#ui.mirror .hptop.right .hpfill.crit {
+  background: var(--danger);
+}
+
+/* Settings > Game: Show WPM, Show power and Show the edge bar (the space stays, so nothing else moves). */
+#ui.hide-wpm .stat.wpm {
+  visibility: hidden;
+}
+#ui.hide-power .stat.power {
+  visibility: hidden;
+}
+#ui.hide-edge #tug,
+#ui.hide-edge #tug-row {
+  visibility: hidden;
+}

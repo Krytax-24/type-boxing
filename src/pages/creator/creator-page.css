@@ -1,0 +1,128 @@
+/* Creator page (#scr-creator): the live fighter on the left, the form on the right; and its "+ Create" card on
+   the Fighter page. */
+.char-new {
+  border-style: dashed;
+}
+.char-new b {
+  color: var(--green, var(--text));
+}
+#scr-creator {
+  grid-template-columns: 448px 640px;
+  gap: 16px;
+  align-items: stretch;
+  max-height: calc(100dvh - 32px);
+}
+#cr-stage {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  background: var(--surface);
+}
+#creator-preview {
+  width: 446px;
+  height: 520px;
+  display: block;
+}
+#cr-side {
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 560px;
+}
+.cr-scroll {
+  overflow-y: auto;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding-right: 8px;
+  min-height: 0;
+}
+.cr-row {
+  flex-wrap: wrap;
+}
+.cr-row .segs,
+.cr-bases,
+.cr-slots,
+.cr-combo,
+.cr-stat {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.cr-bases {
+  max-width: 330px;
+}
+.cr-combo {
+  max-width: 380px;
+}
+.cr-combo .seg {
+  height: auto;
+  min-height: 32px;
+  padding: 2px 6px;
+  line-height: 1.1;
+  font-size: var(--t12);
+}
+.cr-stat b {
+  min-width: 24px;
+  text-align: center;
+  font-size: var(--t16);
+}
+.cr-row .seg:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+#cr-name,
+.cr-name {
+  height: 32px;
+  padding: 0 8px;
+  color: var(--text);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+  font: 700 var(--t12) var(--font);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  outline: none;
+  width: 150px;
+}
+#cr-name:focus,
+.cr-name:focus {
+  border-color: var(--magenta);
+}
+#cr-side input[type="color"] {
+  width: 56px;
+  height: 32px;
+  padding: 0;
+  border: var(--border);
+  background: var(--surface);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+#cr-side .btn-row {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+#ui.narrow #scr-creator {
+  grid-template-columns: 1fr;
+  width: 100%;
+  max-height: none;
+}
+#ui.narrow #cr-stage {
+  display: none;
+}
+#ui.narrow #cr-side {
+  height: auto;
+}
+#ui.narrow .cr-scroll {
+  max-height: 58dvh;
+}
+#ui.narrow .cr-bases,
+#ui.narrow .cr-combo {
+  max-width: none;
+  justify-content: flex-start;
+}
