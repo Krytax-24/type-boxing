@@ -1,0 +1,393 @@
+/* Backspace Brawl (src/modes/brawl): the controls card of the Brawl menu, the fight HUD (brawl-hud.js), the result
+   screen and the touch controls (brawl-touch.js). The HUD shows while Backspace Brawl owns the view. */
+/* ---------- Brawl menu: the controls card ---------- */
+.ctl {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: var(--t12);
+}
+.ctl.two {
+  grid-template-columns: 80px 1fr 1fr;
+}
+.ctl dt {
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.ctl dd {
+  margin: 0;
+  color: var(--text);
+}
+
+/* ---------- Brawl: the fight ---------- */
+#bhud {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#ui[data-mode="brawl"] #bhud {
+  display: block;
+}
+.bh-side {
+  --id: var(--you);
+  position: absolute;
+  top: 12px;
+  width: calc(50% - 112px);
+  padding: 8px 16px 10px;
+  background: var(--hud-bg);
+  border: var(--border);
+  border-top: 4px solid var(--id);
+  border-radius: var(--r);
+}
+.bh-side.left {
+  left: 16px;
+}
+.bh-side.right {
+  right: 16px;
+  --id: var(--foe);
+}
+.bh-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--id);
+  text-transform: uppercase;
+}
+.bh-side.right .bh-name {
+  text-align: right;
+}
+.bh-bar {
+  position: relative;
+  height: 20px;
+  margin-top: 6px;
+  background: var(--track);
+  border: var(--border);
+  overflow: hidden;
+}
+.bh-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+.bh-side.right .bh-bar i {
+  left: auto;
+  right: 0;
+}
+.bh-ghost {
+  background: var(--danger);
+  opacity: 0.55;
+}
+.bh-fill {
+  background: var(--phosphor);
+  transition: width 0.08s linear;
+}
+.bh-hp {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  line-height: 18px;
+  font-size: var(--t12);
+  color: var(--bg);
+  text-align: left;
+  mix-blend-mode: normal;
+}
+.bh-side.right .bh-hp {
+  text-align: right;
+}
+.bh-meter {
+  position: relative;
+  height: 10px;
+  margin-top: 6px;
+  background: var(--track);
+  border: var(--border);
+}
+.bh-meter i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  background: var(--ult-dim);
+}
+.bh-side.right .bh-meter i {
+  left: auto;
+  right: 0;
+}
+.bh-meter.ready i {
+  background: var(--gold);
+}
+.bh-meter span {
+  position: absolute;
+  top: -1px;
+  left: 6px;
+  right: 6px;
+  font-size: 8px;
+  line-height: 12px;
+  letter-spacing: 2px;
+  color: var(--text);
+  opacity: 0;
+}
+.bh-meter.ready span {
+  opacity: 1;
+  color: var(--bg);
+}
+.bh-side.right .bh-meter span {
+  text-align: right;
+}
+.bh-mid {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  width: 192px;
+  margin-left: -96px;
+  padding: 8px 8px 10px;
+  text-align: center;
+  background: var(--hud-bg);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.bh-clock {
+  font-size: var(--t32);
+  font-weight: 700;
+  line-height: 36px;
+  min-height: 36px;
+  font-variant-numeric: tabular-nums;
+}
+.bh-tag {
+  min-height: 16px;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.bh-pause {
+  position: absolute;
+  top: 96px;
+  right: 16px;
+  pointer-events: auto;
+}
+#ui[data-mode="brawl"] #countdown {
+  bottom: auto;
+  top: 30%;
+}
+
+/* Brawl result */
+#scr-bresult {
+  width: 560px;
+  gap: 12px;
+}
+#bko {
+  padding: 12px 24px 12px;
+  text-align: center;
+}
+#bko .ko-title {
+  font-size: var(--t64);
+  line-height: 64px;
+  font-weight: 700;
+  letter-spacing: 8px;
+}
+#bko .ko-title.win {
+  color: var(--phosphor);
+  text-shadow: 4px 0 0 var(--magenta);
+}
+#bko .ko-title.lose {
+  color: var(--danger);
+  text-shadow: 4px 0 0 rgba(var(--text-rgb), 0.25);
+}
+#bko .ko-sub {
+  margin-top: 4px;
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+}
+.bcols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Brawl touch controls: a 3 by 3 pad with diagonals on the left, the four attack buttons (2 by 2) on the right with
+   PROJ, RISE and SUPER above them. Sized from the screen (vmin), so it fits a phone held either way. */
+#touch {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  pointer-events: none;
+  touch-action: none;
+}
+#touch.hidden {
+  display: none;
+}
+#touch-pad,
+#touch-acts {
+  --b: clamp(40px, min(14vmin, 21vw), 84px);
+  display: grid;
+  gap: 5px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#touch-pad {
+  grid-template: repeat(3, var(--b)) / repeat(3, var(--b));
+}
+#touch-pad .ul {
+  grid-area: 1 / 1;
+}
+#touch-pad .up {
+  grid-area: 1 / 2;
+}
+#touch-pad .ur {
+  grid-area: 1 / 3;
+}
+#touch-pad .left {
+  grid-area: 2 / 1;
+}
+#touch-pad .right {
+  grid-area: 2 / 3;
+}
+#touch-pad .dl {
+  grid-area: 3 / 1;
+}
+#touch-pad .down {
+  grid-area: 3 / 2;
+}
+#touch-pad .dr {
+  grid-area: 3 / 3;
+}
+#touch-acts {
+  grid-template-columns: repeat(6, calc(var(--b) * 0.5));
+  grid-template-rows: calc(var(--b) * 0.62) calc(var(--b) * 1.08) calc(var(--b) * 1.08);
+  gap: 6px 5px;
+  align-content: end;
+}
+#touch-acts .sm {
+  grid-column: span 2;
+  grid-row: 1;
+}
+#touch-acts .act {
+  grid-column: span 3;
+}
+#touch-acts .hp,
+#touch-acts .hk {
+  grid-row: 2;
+}
+#touch-acts .lp,
+#touch-acts .lk {
+  grid-row: 3;
+}
+#touch-acts .hp,
+#touch-acts .lp {
+  grid-column: 1 / span 3;
+}
+#touch-acts .hk,
+#touch-acts .lk {
+  grid-column: 4 / span 3;
+}
+#touch.lefty {
+  flex-direction: row-reverse;
+}
+.tb {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: clamp(11px, 3vmin, 16px);
+  letter-spacing: 1px;
+  color: var(--text);
+  background: rgba(var(--surface-rgb), 0.55);
+  border: 2px solid rgba(var(--text-rgb), 0.35);
+  border-radius: 50%;
+  padding: 0;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#touch-pad .tb {
+  border-radius: var(--r);
+}
+#touch-pad .ul,
+#touch-pad .ur,
+#touch-pad .dl,
+#touch-pad .dr {
+  opacity: 0.7;
+}
+.tb.sm {
+  border-radius: var(--r);
+  font-size: clamp(9px, 2.4vmin, 13px);
+  letter-spacing: 0;
+  border-color: var(--magenta);
+}
+.tb.act {
+  border-color: var(--phosphor);
+  display: grid;
+  place-content: center;
+  line-height: 1.15;
+}
+.tb.act i {
+  font-style: normal;
+  font-size: clamp(8px, 2.1vmin, 11px);
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.tb.act b {
+  font-size: clamp(10px, 2.7vmin, 14px);
+}
+.tb.act.kick {
+  border-color: var(--gold);
+}
+.tb.on {
+  background: var(--magenta);
+  border-color: var(--text);
+  color: var(--bg);
+}
+@media (orientation: portrait) {
+  #touch-pad,
+  #touch-acts {
+    --b: clamp(34px, 13.6vw, 72px);
+  }
+  #touch {
+    gap: 4px;
+  }
+}
+
+/* Narrow windows */
+#ui.narrow .bh-side {
+  width: calc(50% - 24px);
+  padding: 6px 8px;
+}
+#ui.narrow .bh-name {
+  letter-spacing: 1px;
+}
+#ui.narrow .bh-mid {
+  top: 84px;
+  width: 140px;
+  margin-left: -70px;
+}
+#ui.narrow .bh-pause {
+  top: 84px;
+}
+#ui.narrow #scr-bresult {
+  width: 100%;
+  max-height: none;
+}
+#ui.narrow .bcols {
+  grid-template-columns: 1fr;
+}

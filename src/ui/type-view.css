@@ -1,0 +1,191 @@
+/* Type view and type result (type-view.js, type-result.js): the Monkeytype style typing box and result block
+   shared by Race and Arm Wrestling. */
+/* ---------- The typing view ---------- */
+.mt {
+  position: relative;
+}
+.mt-live {
+  display: flex;
+  gap: 24px;
+  height: 28px;
+  align-items: center;
+  font-size: var(--t16);
+  font-weight: 700;
+  color: var(--magenta);
+  font-variant-numeric: tabular-nums;
+}
+.mt-live .dim {
+  color: var(--dim);
+  font-weight: 400;
+}
+.mt-live .pen {
+  color: var(--danger);
+}
+.mt-live .pen.hit {
+  animation: mt-pen 0.5s ease-out;
+}
+@keyframes mt-pen {
+  0% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.mt-live span {
+  display: inline-block;
+}
+.mt-words {
+  position: relative;
+  height: 141px;
+  overflow: hidden;
+  font-size: 28px;
+  line-height: 47px;
+}
+.mt-inner {
+  position: relative;
+  transition: transform 0.15s ease-out;
+}
+.mt-w {
+  display: inline-block;
+  margin-right: 0.6em;
+  color: var(--dim);
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  line-height: 43px;
+}
+.mt-w .l {
+  transition: color 0.06s linear;
+}
+.mt-w .l.ok {
+  color: var(--text);
+}
+.mt-w .l.bad {
+  color: var(--danger);
+}
+.mt-w .l.x {
+  color: var(--extra);
+}
+.mt-w.wrong {
+  border-bottom-color: var(--danger);
+}
+.mt-w.err {
+  border-bottom-color: rgba(255, 77, 94, 0.45);
+}
+.mt-w.nudge {
+  animation: mt-nudge 0.18s linear;
+}
+@keyframes mt-nudge {
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+.mt-caret {
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--magenta);
+  transition: transform 0.09s ease-out;
+  animation: mt-blink 1s ease-in-out infinite;
+  will-change: transform;
+}
+.mt.typing .mt-caret {
+  animation: none;
+}
+@keyframes mt-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+body.mt-nocursor,
+body.mt-nocursor * {
+  cursor: none !important;
+}
+.mt-arm .mt-words {
+  font-size: 26px;
+}
+
+/* ---------- The result block ---------- */
+.mt-res {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 24px;
+  margin-bottom: 16px;
+}
+.mt-big {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+.mt-big span,
+.mt-small span {
+  display: block;
+  font-size: var(--t16);
+  color: var(--dim);
+  line-height: 1;
+}
+.mt-big b {
+  display: block;
+  font-size: 56px;
+  line-height: 64px;
+  color: var(--phosphor);
+  font-variant-numeric: tabular-nums;
+}
+.mt-graph {
+  min-width: 0;
+}
+.mt-chart .sp {
+  height: 150px;
+}
+.mt-chart svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+}
+.mt-xlab {
+  position: relative;
+  height: 16px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.mt-xlab span {
+  position: absolute;
+  transform: translateX(-50%);
+  top: 2px;
+}
+.mt-small {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 40px;
+}
+.mt-small b {
+  display: block;
+  font-size: var(--t24);
+  line-height: 32px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.mt-small b i {
+  font-style: normal;
+  color: var(--dim);
+  margin: 0 2px;
+}
+.key-i i.xm {
+  width: auto;
+  height: auto;
+  background: none;
+  color: var(--danger);
+  font-style: normal;
+  font-weight: 700;
+}

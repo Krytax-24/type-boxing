@@ -1,0 +1,238 @@
+/* Shell: the Terminal Arcade tokens, the full screen frame, the layers over the arena (HUD layer, screens,
+   modals), the shared fight overlays (countdown), and the frame rate readout.
+   Palette: CONFIG.theme.ui (src/core/config.js); themes.js writes it onto :root at start, so these values are the
+   fallback. #ui is designed at 1366 x 768 and scaled to the window by layout.js, so every px value is a design px.
+   Type scale: 12 / 16 / 24 / 32 / 64 px, weights 400 and 700. Spacing: 8 px grid (4 px only inside bars).
+   Panels: one radius (--r, 4 px) and one border (1 px solid --line). */
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #060a18;
+  --surface: #0b1129;
+  --raised: #121a3a;
+  --line: #2a3a73;
+  --text: #e8edff;
+  --dim: #8d9ac8;
+  --phosphor: #4dff9a;
+  --magenta: #ff3ea5;
+  --gold: #ffc53d;
+  --danger: #ff4d5e;
+  --warn: #ff8a3d;
+  --info: #7ce3ff;
+  --track: #18224a;
+  --you: #f1f3f8; /* your identity color (looks.js, from your fighter) */
+  --you-letters: #4ade80; /* your correct letters */
+  --foe: #e8737d; /* the opponent's identity color for this match */
+  --r: 4px;
+  --border: 1px solid var(--line);
+  --font: "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", "Courier New", monospace;
+  --t12: 12px;
+  --t16: 16px;
+  --t24: 24px;
+  --t32: 32px;
+  --t64: 64px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* A dark outline for text that sits over the scenery. */
+  --outline:
+    0 2px 0 rgba(var(--outline-rgb), 0.95), 0 -1px 0 rgba(var(--outline-rgb), 0.95),
+    1px 0 0 rgba(var(--outline-rgb), 0.95), -1px 0 0 rgba(var(--outline-rgb), 0.95),
+    0 0 8px rgba(var(--outline-rgb), 0.85);
+  --panel-bg: rgba(11, 17, 41, 0.9);
+  --hud-bg: var(--panel-bg); /* HUD panels only: theme-tokens.js sets it from the HUD opacity setting */
+  --bg-rgb: 6, 10, 24;
+  --surface-rgb: 11, 17, 41;
+  --raised-rgb: 18, 26, 58;
+  --line-rgb: 42, 58, 115;
+  --text-rgb: 232, 237, 255;
+  --phosphor-rgb: 77, 255, 154;
+  --magenta-rgb: 255, 62, 165;
+  --gold-rgb: 255, 197, 61;
+  --outline-rgb: 2, 4, 12;
+  --ult-dim: #a8862a;
+  --extra: #a8323e;
+}
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--t16);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The arena: edge to edge, no frame. arena.js sizes the backing store to the window times the pixel ratio. */
+#arena {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  background: var(--bg);
+}
+
+/* Everything over the arena. layout.js sets its width, height and scale. */
+#ui {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1366px;
+  height: 768px;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+#ui button,
+#overlay,
+#modal {
+  pointer-events: auto;
+}
+#ui button {
+  font-family: var(--font);
+  color: var(--text);
+}
+
+/* Each game mode mounts its fight HUD here. A mode's CSS shows its HUD only under #ui[data-mode="<its id>"]. */
+#hud-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The big countdown, shared by the fights that count down on it (the Duel and Backspace Brawl). */
+#countdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 48px;
+  text-align: center;
+  font-size: var(--t64);
+  line-height: 64px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--text);
+  pointer-events: none;
+  text-shadow:
+    3px 0 0 var(--magenta),
+    -3px 0 0 rgba(var(--phosphor-rgb), 0.6),
+    var(--outline);
+}
+
+/* ---------- Screens: one at a time in the overlay, panels floating over the live arena (router.js) ---------- */
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 72px 24px 16px;
+  background: rgba(var(--bg-rgb), 0.72)
+    repeating-linear-gradient(0deg, var(--scan, rgba(0, 0, 0, 0.18)) 0 1px, transparent 1px 3px);
+}
+#overlay.hidden {
+  display: none;
+}
+.screen {
+  display: none;
+}
+.screen.is-active {
+  display: grid;
+}
+
+/* ---------- Modals: pause, settings, confirm, stacked over a screen or a fight (modals.js) ---------- */
+#modal {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--bg-rgb), 0.88)
+    repeating-linear-gradient(0deg, var(--scan, rgba(0, 0, 0, 0.18)) 0 1px, transparent 1px 3px);
+}
+#modal.hidden {
+  display: none;
+}
+.modal {
+  display: none;
+  padding: 24px;
+}
+.modal.is-active {
+  display: grid;
+}
+
+/* Screen and modal entry: a short fade and rise, so moving between menus reads as one motion. */
+.screen,
+.modal {
+  animation: screen-in 0.22s var(--ease) both;
+}
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- Frame rate readout (Graphics > Show FPS) ---------- */
+#perf {
+  position: absolute;
+  z-index: 6;
+  right: 16px;
+  bottom: 16px;
+  padding: 4px 8px;
+  font-size: var(--t12);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: rgba(var(--bg-rgb), 0.8);
+  border: var(--border);
+  border-radius: var(--r);
+  pointer-events: none;
+}
+#perf.hidden {
+  display: none;
+}
+
+/* Reduce motion: the system setting, or the game setting (layout.js adds .reduce-motion to #ui). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ---------- Phones and narrow windows ----------
+   layout.js adds .narrow and lays the UI out about 440 design px wide. */
+#ui.narrow #overlay {
+  padding: 64px 8px 8px;
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+#ui.narrow #modal {
+  align-items: flex-start;
+  overflow-y: auto;
+  padding: 8px;
+}

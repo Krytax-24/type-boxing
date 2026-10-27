@@ -1,0 +1,82 @@
+/* Duel stream view (duel-stream-view.js): the Classic view's Monkeytype style typing box, bottom center between
+   the HUD panels. Shown only in the Classic view while the Duel owns the view. */
+#typing-box {
+  display: none;
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  width: 438px;
+  margin-left: -219px;
+  padding: 16px 24px;
+  pointer-events: auto;
+}
+#ui[data-mode="duel"].classic:not(.idle) #typing-box {
+  display: block;
+}
+#ui[data-mode="duel"].classic #countdown {
+  bottom: 216px;
+}
+#words {
+  height: 138px;
+  overflow: hidden;
+  position: relative;
+  font-size: 28px;
+}
+#words-inner {
+  position: relative;
+  transition: transform 0.12s ease-out;
+}
+.word {
+  display: inline-block;
+  line-height: 46px;
+  margin-right: 14px;
+  vertical-align: top;
+  color: var(--dim);
+}
+.word .ok {
+  color: var(--text);
+}
+.word .bad {
+  color: var(--danger);
+}
+.word .extra {
+  color: var(--extra);
+}
+.word.wrong {
+  border-bottom: 2px solid var(--danger);
+  line-height: 44px;
+}
+.word.ult {
+  color: var(--ult-dim);
+}
+.word.ult::before {
+  content: "ULT ";
+  font-size: var(--t12);
+  color: var(--gold);
+  letter-spacing: 2px;
+  vertical-align: top;
+}
+.word.ult .ok {
+  color: var(--gold);
+}
+.word.ult .bad {
+  color: var(--danger);
+}
+#caret {
+  position: absolute;
+  width: 3px;
+  height: 34px;
+  background: var(--magenta);
+  transition:
+    left 0.07s linear,
+    top 0.1s ease-out;
+  animation: blink 1s steps(2, start) infinite;
+}
+#caret.typing {
+  animation: none;
+}
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}

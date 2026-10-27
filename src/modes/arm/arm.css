@@ -1,0 +1,185 @@
+/* Arm Wrestling (src/modes/arm): the clock and pull meter on top, a panel per wrestler in the bottom corners and the
+   typing box (arm-hud.js). The HUD shows only while Arm Wrestling owns the view. */
+#ahud {
+  display: none;
+}
+#ui[data-mode="arm"]:not(.idle) #ahud {
+  display: block;
+}
+#a-go {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  text-align: center;
+  font-size: var(--t64);
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: var(--phosphor);
+  text-shadow: var(--outline);
+  pointer-events: none;
+}
+/* ---------- Arm Wrestling: clock and pull meter on top, a panel per player in the bottom corners ---------- */
+#a-top {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  width: 432px;
+  margin-left: -216px;
+  padding: 8px 16px 10px;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  background: var(--hud-bg);
+}
+#a-timer {
+  font-size: var(--t32);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 36px;
+}
+#a-timer.sudden {
+  color: var(--danger);
+}
+#a-tug {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: var(--track);
+  border: var(--border);
+}
+#a-tug-mid {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--dim);
+}
+#a-tug-knot {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  background: var(--magenta);
+  transform: rotate(45deg);
+  transition: left 0.08s linear;
+}
+#a-tug-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+}
+#a-tug-row span:first-child {
+  color: var(--you);
+}
+#a-tug-row span:last-child {
+  color: var(--foe);
+}
+#a-state {
+  color: var(--text);
+  font-weight: 700;
+}
+.a-side {
+  position: absolute;
+  bottom: 16px;
+  width: 260px;
+  padding: 10px 16px 12px;
+  border-top: 4px solid var(--id);
+  background: var(--hud-bg);
+  display: grid;
+  gap: 6px;
+}
+.a-side.left {
+  left: 16px;
+}
+.a-side.right {
+  right: 16px;
+}
+.a-name {
+  font-size: var(--t16);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--id);
+}
+.a-power {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.a-power span {
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+}
+.a-power b {
+  font-size: var(--t32);
+  font-variant-numeric: tabular-nums;
+}
+.a-bar {
+  height: 8px;
+  background: var(--track);
+}
+.a-bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--id);
+  transition: width 0.1s linear;
+}
+.a-kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  font-size: var(--t12);
+}
+.a-kv dt {
+  color: var(--dim);
+}
+.a-kv dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.a-word {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.a-word b {
+  font-size: var(--t16);
+  color: var(--dim);
+  font-weight: 400;
+}
+.a-word u {
+  text-decoration: none;
+  color: var(--foe);
+}
+#arm-box {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  width: 740px;
+  margin-left: -370px;
+  padding: 12px 28px 14px;
+}
+.a-side.hot {
+  box-shadow:
+    0 0 0 1px var(--id),
+    0 0 24px -6px var(--id);
+}
+#a-go.win {
+  color: var(--phosphor);
+}
+#a-go.lose {
+  color: var(--danger);
+}

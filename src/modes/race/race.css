@@ -1,0 +1,144 @@
+/* Race (src/modes/race): the vehicle cards of the Race menu, the HUD strip and the passage box (race-hud.js), and
+   the standings table of the result. The HUD shows only while the Race owns the view. */
+/* Race menu: vehicle cards. */
+.veh-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.veh {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 4px 8px;
+  color: var(--dim);
+  font-size: var(--t12);
+}
+.veh canvas {
+  width: 120px;
+  height: 53px;
+}
+.veh b {
+  color: var(--text);
+  font-size: var(--t12);
+  letter-spacing: 1px;
+}
+.veh.locked {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- Race: HUD strip, the passage box ---------- */
+#rhud,
+#race-box {
+  display: none;
+}
+#ui[data-mode="race"]:not(.idle) #rhud,
+#ui[data-mode="race"]:not(.idle) #race-box {
+  display: block;
+}
+#r-top {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 72px;
+  padding: 0 24px;
+  background: var(--hud-bg);
+}
+.r-lights {
+  display: flex;
+  gap: 8px;
+}
+.r-lights i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--track);
+}
+.r-lights i.red {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.r-lights i.green {
+  background: var(--phosphor);
+  border-color: var(--phosphor);
+}
+.r-stat {
+  display: grid;
+  justify-items: center;
+  line-height: 1.1;
+}
+.r-stat span {
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.r-stat b {
+  font-size: var(--t24);
+  font-variant-numeric: tabular-nums;
+}
+.r-stat.big b {
+  font-size: var(--t32);
+  color: var(--phosphor);
+}
+.r-tag {
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--magenta);
+  border: 1px solid var(--magenta);
+  border-radius: var(--r);
+  padding: 2px 8px;
+}
+#r-go {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 34%;
+  text-align: center;
+  font-size: var(--t64);
+  font-weight: 700;
+  letter-spacing: 8px;
+  color: var(--phosphor);
+  text-shadow: var(--outline);
+  pointer-events: none;
+}
+#race-box {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  width: 1080px;
+  margin-left: -540px;
+  padding: 12px 32px 16px;
+}
+.r-stat.hot b {
+  color: var(--danger);
+}
+
+/* ---------- Race result: the standings table ---------- */
+.mr-table .pen {
+  color: var(--danger);
+}
+.mr-table td .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.mr-table td i {
+  margin-left: 4px;
+  font-style: normal;
+  color: var(--dim);
+}
+.mr-table tr.you td {
+  color: var(--phosphor);
+  font-weight: 700;
+}
