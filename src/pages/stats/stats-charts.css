@@ -1,0 +1,24 @@
+/* Stats charts (stats-charts.js): the extra numbers under a Duel match chart, on the Duel result screen and when
+   My stats opens a match again. The chart legend and hover are in the UI kit. */
+.extra {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 4px 24px;
+  font-size: var(--t12);
+}
+.extra > div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.extra .wide {
+  grid-column: 1 / -1;
+}
+.extra dt {
+  color: var(--dim);
+}
+.extra dd {
+  margin: 0;
+  font-weight: 700;
+}

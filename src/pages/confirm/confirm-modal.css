@@ -1,0 +1,15 @@
+/* Quit confirm (#mod-confirm). */
+#mod-confirm {
+  width: 448px;
+  gap: 16px;
+}
+#mod-confirm p {
+  margin: 0;
+  font-size: var(--t12);
+  line-height: 1.6;
+  color: var(--dim);
+}
+#ui.narrow #mod-confirm {
+  width: 100%;
+  max-height: none;
+}

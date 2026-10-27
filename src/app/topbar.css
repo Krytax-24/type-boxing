@@ -1,0 +1,54 @@
+/* Top bar (topbar.js), menus only: your fighter chip on the left, Settings and Fullscreen on the right. */
+#topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(rgba(var(--bg-rgb), 0.85), rgba(var(--bg-rgb), 0));
+  z-index: 3; /* above the menu overlay, under the modals */
+}
+#ui:not(.idle) #topbar {
+  display: none;
+}
+.fighter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 16px 0 8px;
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.chip-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r);
+  background: var(--you);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.chip-name {
+  font-size: var(--t16);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--you);
+}
+.chip-weapon b {
+  color: var(--text);
+}
+.icons {
+  display: flex;
+  gap: 8px;
+}
+#ui.narrow .chip-weapon,
+#ui.narrow .chip-color {
+  display: none;
+}

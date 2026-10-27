@@ -1,0 +1,20 @@
+/* Pause menu (#mod-pause): Resume, Restart, Settings and Quit in a fight; Close, Settings and Leave room online. */
+#mod-pause {
+  width: 416px;
+  gap: 8px;
+}
+#mod-pause .screen-title {
+  margin-bottom: 8px;
+}
+#mod-pause .mbtn {
+  height: 56px;
+  font-size: var(--t24);
+}
+#mod-pause .mbtn.primary {
+  height: 72px;
+  font-size: var(--t32);
+}
+#ui.narrow #mod-pause {
+  width: 100%;
+  max-height: none;
+}

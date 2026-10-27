@@ -1,0 +1,802 @@
+/* UI kit: the shared building blocks every screen uses (src/ui). Buttons (buttons.js), the key line (keyline.js),
+   option rows (option-row.js, match-rules-rows.js), the toast (toast.js), the round banner (banner.js), panels,
+   labels, tables, tiles, loading skeletons, the ranked pieces (rank-badges.js) and chart legends with their hover
+   (chart-hover.js). One shape for every button: hover lightens the border and raises the color, pressed moves 1 px
+   down at 98%; the primary action is phosphor green with dark text. */
+
+/* ---------- Panels and labels ---------- */
+.panel {
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.screen-title {
+  margin: 0;
+  font-size: var(--t24);
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+}
+.card-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  color: var(--dim);
+  text-transform: uppercase;
+}
+.modal-note {
+  margin: 8px 0 0;
+  font-size: var(--t12);
+  line-height: 1.6;
+  color: var(--dim);
+}
+.opt-note {
+  margin: 0;
+  font-size: var(--t12);
+  line-height: 1.6;
+  color: var(--dim);
+}
+.opt-note b {
+  color: var(--text);
+}
+
+/* ---------- Buttons: one shape, tactile states ---------- */
+#ui .btn.primary,
+#ui .mbtn.primary {
+  color: var(--bg);
+}
+.btn,
+.mbtn,
+.icon-btn,
+.key,
+.seg,
+.fighter-chip,
+.pick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    background 0.15s var(--ease),
+    filter 0.15s var(--ease);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 24px;
+  font-size: var(--t16);
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.btn:hover,
+.mbtn:hover,
+.icon-btn:hover,
+.key:hover,
+.seg:hover,
+.fighter-chip:hover {
+  border-color: var(--dim);
+  background: var(--raised);
+}
+.btn:active,
+.mbtn:active,
+.icon-btn:active,
+.key:active,
+.seg:active,
+.fighter-chip:active,
+.pick:active {
+  transform: translateY(1px) scale(0.98);
+}
+.btn.primary,
+.mbtn.primary {
+  background: var(--phosphor);
+  border-color: var(--phosphor);
+  color: var(--bg);
+}
+.btn.primary:hover,
+.mbtn.primary:hover {
+  background: var(--phosphor);
+  filter: brightness(1.12);
+}
+.btn.primary kbd,
+.mbtn.primary kbd {
+  background: rgba(var(--bg-rgb), 0.85);
+  border-color: rgba(var(--bg-rgb), 0.85);
+  color: var(--phosphor);
+}
+.btn-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.btn-row.left {
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+}
+.btn-row.left .btn {
+  height: 40px;
+  padding: 0 16px;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 0 8px;
+  font: 700 var(--t12)/24px var(--font);
+  text-align: center;
+  letter-spacing: 0;
+  color: var(--text);
+  background: var(--raised);
+  border: var(--border);
+  border-radius: var(--r);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px;
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+  color: var(--text);
+}
+.icon-btn svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+.icon-btn.on {
+  border-color: var(--magenta);
+}
+
+/* Big menu buttons (title views, pause menu), with an optional second line. */
+.mbtn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 56px;
+  padding: 0 16px 0 24px;
+  font-size: var(--t24);
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  text-align: left;
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.mbtn:hover {
+  transform: translateX(4px);
+}
+.mbtn.primary {
+  height: 96px;
+  font-size: var(--t64);
+  letter-spacing: 8px;
+}
+.mbtn .sub {
+  display: block;
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  font-weight: 400;
+  text-transform: none;
+}
+.mbtn.primary .sub {
+  color: rgba(var(--bg-rgb), 0.8);
+}
+.mbtn.mode {
+  height: 48px;
+  font-size: var(--t16);
+}
+.mbtn.mode.sel {
+  border-color: var(--magenta);
+  background: var(--raised);
+  box-shadow: inset 4px 0 0 var(--magenta);
+}
+#ui.narrow .mbtn {
+  height: 48px;
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+#ui.narrow .mbtn.primary {
+  height: 72px;
+  font-size: 40px;
+  letter-spacing: 4px;
+}
+
+/* Selectable cards: bots, fighters, vehicles. Selected = magenta border on a raised panel. */
+.pick {
+  border: var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+}
+.pick:hover {
+  border-color: var(--dim);
+  background: var(--raised);
+}
+.pick.sel {
+  border-color: var(--magenta);
+  background: var(--raised);
+  box-shadow: inset 4px 0 0 var(--magenta);
+}
+
+/* Segmented choices (settings rows, option rows, filters). */
+.segs {
+  display: inline-flex;
+  gap: 4px;
+}
+.seg {
+  height: 36px;
+  min-width: 64px;
+  padding: 0 12px;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.seg.sel {
+  color: var(--bg);
+  background: var(--magenta);
+  border-color: var(--magenta);
+}
+.seg:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.seg.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* ---------- The key line under the menus: every chip is a button ---------- */
+#keyline {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.key b {
+  color: var(--text);
+  font-weight: 400;
+}
+
+/* ---------- Option rows: a label with a hint and a row of choices ---------- */
+.optrows {
+  display: grid;
+  gap: 8px;
+}
+.optrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.optrow .lbl {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text);
+  text-transform: uppercase;
+}
+.optrow .hint {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--t12);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--dim);
+}
+.optrow .segs {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.optrow .seg {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+}
+.optrows.compact .hint {
+  display: none;
+}
+.optrows.compact .optrow {
+  padding: 4px 8px;
+}
+.optrows.compact .seg {
+  height: 28px;
+}
+#ui.narrow .optrow {
+  grid-template-columns: 1fr;
+  flex-wrap: wrap;
+}
+
+/* ---------- Toast and the round banner ---------- */
+#toast {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  max-width: 640px;
+  padding: 12px 16px;
+  font-size: var(--t12);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--warn);
+  border-radius: var(--r);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+  pointer-events: none;
+}
+#toast.on {
+  opacity: 1;
+}
+#round-banner {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  padding: 16px 32px;
+  background: var(--panel-bg);
+  border: var(--border);
+  border-radius: var(--r);
+  pointer-events: none;
+}
+#round-banner.hidden {
+  display: none;
+}
+#round-banner b {
+  display: block;
+  font-size: var(--t32);
+  letter-spacing: 6px;
+  color: var(--phosphor);
+  text-shadow: var(--outline);
+}
+#round-banner span {
+  display: block;
+  margin-top: 8px;
+  font-size: var(--t16);
+  color: var(--text);
+  letter-spacing: 2px;
+}
+
+/* ---------- Text, tables, tiles and blocks shared by the info screens ---------- */
+.st-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.st-head .btn {
+  height: 40px;
+}
+.sub {
+  margin: 0;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.note {
+  margin: 8px 0 0;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.tile {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  background: rgba(var(--raised-rgb), 0.5);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.tile .tl {
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.tile b {
+  font-size: var(--t24);
+  line-height: 32px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.tile .ts {
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.blk {
+  padding: 12px 16px;
+  background: rgba(var(--raised-rgb), 0.35);
+  border: var(--border);
+  border-radius: var(--r);
+}
+.blk h3 {
+  margin: 0 0 8px;
+  font-size: var(--t16);
+}
+.blk h3.mt {
+  margin-top: 16px;
+}
+.blk h4 {
+  margin: 0 0 8px;
+  font-size: var(--t12);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.blk-head,
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.blk-head h3 {
+  margin: 0;
+  color: var(--text);
+}
+.blk-head .segs {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.blk .chart-head {
+  color: var(--dim);
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t12);
+  font-variant-numeric: tabular-nums;
+}
+.tbl th,
+.tbl td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(var(--line-rgb), 0.5);
+}
+.tbl th {
+  color: var(--dim);
+  font-weight: 400;
+}
+.tbl .th {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  letter-spacing: 1px;
+}
+.tbl .th:hover,
+.tbl .th.on {
+  color: var(--text);
+}
+.tbl tr.click {
+  cursor: pointer;
+}
+.tbl tr.click:hover {
+  background: var(--raised);
+}
+.tbl td.w {
+  color: var(--phosphor);
+  font-weight: 700;
+}
+.tbl td.l {
+  color: var(--warn);
+  font-weight: 700;
+}
+.tbl .num {
+  text-align: right;
+}
+.kv {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: var(--t12);
+}
+.kv > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.kv dt {
+  color: var(--dim);
+}
+.kv dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.chart-empty,
+.empty {
+  padding: 16px;
+  font-size: var(--t12);
+  color: var(--dim);
+  text-align: center;
+}
+.empty.big {
+  font-size: var(--t16);
+  line-height: 1.6;
+  padding: 48px 24px;
+}
+
+/* The result columns (Duel, Arm Wrestling, Backspace Brawl): each player's numbers in their identity color. */
+.rcol {
+  padding: 8px 16px;
+  border-top: 4px solid var(--id);
+}
+.rcol h3 {
+  margin: 0 0 8px;
+  font-size: var(--t16);
+  letter-spacing: 2px;
+  color: var(--id);
+}
+.rcol dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  font-size: var(--t12);
+}
+.rcol dt {
+  color: var(--dim);
+}
+.rcol dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Chart legends and the hover line and tooltip (chart-hover.js) ---------- */
+.key-i {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.key-i i {
+  display: inline-block;
+  width: 16px;
+  height: 2px;
+}
+.key-i i.dash {
+  height: 0;
+  border-top: 2px dashed currentColor;
+  background: none !important;
+  opacity: 0.7;
+}
+.key-i i.tick {
+  width: 2px;
+  height: 10px;
+  background: var(--danger);
+}
+.key-i i.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--you);
+}
+.hover-wrap {
+  position: relative;
+}
+.hover-wrap .sp {
+  position: relative;
+}
+.ylab {
+  position: absolute;
+  left: 4px;
+  font-size: var(--t12);
+  line-height: 14px;
+  color: var(--dim);
+  pointer-events: none;
+}
+.hover-wrap .cross {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--dim);
+  pointer-events: none;
+}
+.hover-wrap .tip {
+  display: none;
+  position: absolute;
+  top: -4px;
+  transform: translateY(-100%);
+  padding: 4px 8px;
+  font-size: var(--t12);
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--r);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ---------- Ranked pieces (rank-badges.js) ---------- */
+/* Tier chip: the tier's own color on a dark chip with a bar on the left (color plus the name, never color alone). */
+.tier-chip {
+  --tc: var(--dim);
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px 0 10px;
+  white-space: nowrap;
+  font-size: var(--t12);
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--tc);
+  background: rgba(var(--bg-rgb), 0.6);
+  border: 1px solid var(--tc);
+  border-radius: var(--r);
+  box-shadow: inset 3px 0 0 var(--tc);
+}
+.tier-chip.none {
+  --tc: var(--dim);
+  font-weight: 400;
+}
+.mr-ranked {
+  padding: 12px 16px;
+  display: grid;
+  gap: 8px;
+}
+.mr-delta {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  font-size: var(--t16);
+}
+.mr-delta b {
+  font-size: var(--t24);
+  font-variant-numeric: tabular-nums;
+}
+.mr-delta b.up {
+  color: var(--phosphor);
+}
+.mr-delta b.down {
+  color: var(--warn);
+}
+.promo,
+.demo,
+.shield {
+  font-size: var(--t12);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.promo {
+  color: var(--phosphor);
+}
+.demo {
+  color: var(--warn);
+}
+.shield {
+  color: var(--info);
+}
+.mr-rp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mr-rp b {
+  font-size: var(--t16);
+  font-variant-numeric: tabular-nums;
+}
+.mr-rp .rk {
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.rp-bar {
+  height: 8px;
+  background: var(--track);
+}
+.rp-bar i {
+  display: block;
+  height: 100%;
+  background: var(--info);
+}
+.rp-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--t12);
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.mr-mmr {
+  font-size: var(--t12);
+  color: var(--dim);
+}
+.tag-r {
+  display: inline-block;
+  font-size: var(--t12);
+  padding: 0 4px;
+  border: 1px solid var(--magenta);
+  color: var(--magenta);
+  border-radius: var(--r);
+}
+
+/* ---------- Loading skeletons, shaped like what they stand for ---------- */
+.skel {
+  display: block;
+  height: 12px;
+  margin: 6px 0;
+  border-radius: var(--r);
+  background: linear-gradient(90deg, var(--track) 0%, var(--raised) 50%, var(--track) 100%);
+  background-size: 200% 100%;
+  animation: skel 1.2s linear infinite;
+}
+.skel.w40 {
+  display: inline-block;
+  width: 96px;
+  margin: 0;
+}
+.skel.w60 {
+  width: 60%;
+}
+.skel.w90 {
+  width: 90%;
+}
+@keyframes skel {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

@@ -1,0 +1,7 @@
+# Third-party and generated files keep their own format.
+src/vendor/
+dist/
+node_modules/
+*.min.js
+# Your own relay keys (left out of git): written by hand, never reformatted.
+src/net/net-keys.js

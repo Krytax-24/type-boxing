@@ -1,0 +1,27 @@
+{
+  "name": "countertype",
+  "version": "2.0.0",
+  "private": true,
+  "description": "CounterType: a real-time typing fighting game for the browser. Plain HTML, CSS and JavaScript, no build step.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node tools/serve.js",
+    "test": "node tests/run-all.js",
+    "test:quick": "node tests/run-all.js --quick",
+    "lint": "eslint src tests tools",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "health": "node tools/health-check.js",
+    "build": "node tools/build.js",
+    "bump": "node tools/bump-version.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
